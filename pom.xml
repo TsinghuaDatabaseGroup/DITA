@@ -2700,5 +2700,8 @@
     <profile>
       <id>sparkr</id>
     </profile>
+    <profile>
+      <id>dita</id>
+    </profile>
   </profiles>
 </project>
