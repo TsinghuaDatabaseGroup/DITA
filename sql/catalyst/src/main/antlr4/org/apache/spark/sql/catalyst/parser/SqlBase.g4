@@ -536,6 +536,14 @@ predicate
     | IS NOT? kind=NULL
     ;
 
+// Trajectory Similarity Functions
+trajectorySimilarityFunction
+    : DTW
+    | FRECHET
+    | EDR
+    | LCSS
+    ;
+
 valueExpression
     : primaryExpression                                                                      #valueExpressionDefault
     | operator=(MINUS | PLUS | TILDE) valueExpression                                        #arithmeticUnary
@@ -548,24 +556,25 @@ valueExpression
     ;
 
 primaryExpression
-    : name=(CURRENT_DATE | CURRENT_TIMESTAMP)                                                  #timeFunctionCall
-    | CASE whenClause+ (ELSE elseExpression=expression)? END                                   #searchedCase
-    | CASE value=expression whenClause+ (ELSE elseExpression=expression)? END                  #simpleCase
-    | CAST '(' expression AS dataType ')'                                                      #cast
-    | STRUCT '(' (argument+=namedExpression (',' argument+=namedExpression)*)? ')'             #struct
-    | FIRST '(' expression (IGNORE NULLS)? ')'                                                 #first
-    | LAST '(' expression (IGNORE NULLS)? ')'                                                  #last
-    | constant                                                                                 #constantDefault
-    | ASTERISK                                                                                 #star
-    | qualifiedName '.' ASTERISK                                                               #star
-    | '(' namedExpression (',' namedExpression)+ ')'                                           #rowConstructor
-    | '(' query ')'                                                                            #subqueryExpression
+    : name=(CURRENT_DATE | CURRENT_TIMESTAMP)                                                           #timeFunctionCall
+    | function=trajectorySimilarityFunction '(' left=primaryExpression ',' right=primaryExpression ')'  #trajectorySimilarity
+    | CASE whenClause+ (ELSE elseExpression=expression)? END                                            #searchedCase
+    | CASE value=expression whenClause+ (ELSE elseExpression=expression)? END                           #simpleCase
+    | CAST '(' expression AS dataType ')'                                                               #cast
+    | STRUCT '(' (argument+=namedExpression (',' argument+=namedExpression)*)? ')'                      #struct
+    | FIRST '(' expression (IGNORE NULLS)? ')'                                                          #first
+    | LAST '(' expression (IGNORE NULLS)? ')'                                                           #last
+    | constant                                                                                          #constantDefault
+    | ASTERISK                                                                                          #star
+    | qualifiedName '.' ASTERISK                                                                        #star
+    | '(' namedExpression (',' namedExpression)+ ')'                                                    #rowConstructor
+    | '(' query ')'                                                                                     #subqueryExpression
     | qualifiedName '(' (setQuantifier? argument+=expression (',' argument+=expression)*)? ')'
-       (OVER windowSpec)?                                                                      #functionCall
-    | value=primaryExpression '[' index=valueExpression ']'                                    #subscript
-    | identifier                                                                               #columnReference
-    | base=primaryExpression '.' fieldName=identifier                                          #dereference
-    | '(' expression ')'                                                                       #parenthesizedExpression
+       (OVER windowSpec)?                                                                               #functionCall
+    | value=primaryExpression '[' index=valueExpression ']'                                             #subscript
+    | identifier                                                                                        #columnReference
+    | base=primaryExpression '.' fieldName=identifier                                                   #dereference
+    | '(' expression ')'                                                                                #parenthesizedExpression
     ;
 
 constant
@@ -957,6 +966,12 @@ LOCAL: 'LOCAL';
 INPATH: 'INPATH';
 CURRENT_DATE: 'CURRENT_DATE';
 CURRENT_TIMESTAMP: 'CURRENT_TIMESTAMP';
+
+// Trajectory Similarity Functions
+DTW: 'DTW';
+FRECHET: 'FRECHET';
+EDR: 'EDR';
+LCSS: 'LCSS';
 
 STRING
     : '\'' ( ~('\''|'\\') | ('\\' .) )* '\''

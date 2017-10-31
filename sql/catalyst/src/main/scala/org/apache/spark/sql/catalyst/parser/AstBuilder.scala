@@ -23,16 +23,15 @@ import javax.xml.bind.DatatypeConverter
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable.ArrayBuffer
-
 import org.antlr.v4.runtime.{ParserRuleContext, Token}
 import org.antlr.v4.runtime.tree.{ParseTree, RuleNode, TerminalNode}
-
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.AnalysisException
 import org.apache.spark.sql.catalyst.{FunctionIdentifier, TableIdentifier}
 import org.apache.spark.sql.catalyst.analysis._
-import org.apache.spark.sql.catalyst.expressions._
+import org.apache.spark.sql.catalyst.expressions.{dita, _}
 import org.apache.spark.sql.catalyst.expressions.aggregate.{First, Last}
+import org.apache.spark.sql.catalyst.expressions.dita.TrajectorySimilarityExpression
 import org.apache.spark.sql.catalyst.parser.SqlBaseParser._
 import org.apache.spark.sql.catalyst.plans._
 import org.apache.spark.sql.catalyst.plans.logical._
@@ -1093,6 +1092,17 @@ class AstBuilder(conf: SQLConf) extends SqlBaseBaseVisitor[AnyRef] with Logging 
         CurrentDate()
       case SqlBaseParser.CURRENT_TIMESTAMP =>
         CurrentTimestamp()
+    }
+  }
+
+  /**
+    * Create a trajectory similarity expression
+    */
+  override def visitTrajectorySimilarity
+    (ctx: TrajectorySimilarityContext): Expression = withOrigin(ctx) {
+    ctx.function match {
+      case function if function.DTW != null => TrajectorySimilarityExpression(
+        dita.DTW, expression(ctx.left), expression(ctx.right))
     }
   }
 
