@@ -1097,6 +1097,17 @@ class AstBuilder(conf: SQLConf) extends SqlBaseBaseVisitor[AnyRef] with Logging 
   }
 
   /**
+    * Create a trajectory similarity expression
+    */
+  override def visitTrajectorySimilarity
+    (ctx: TrajectorySimilarityContext): Expression = withOrigin(ctx) {
+    ctx.function match {
+      case function if function.DTW != null => TrajectorySimilarityFunction(
+        SqlBaseParser.DTW.toString, expression(ctx.left), expression(ctx.right))
+    }
+  }
+
+  /**
    * Create a function database (optional) and name pair.
    */
   protected def visitFunctionName(ctx: QualifiedNameContext): FunctionIdentifier = {
