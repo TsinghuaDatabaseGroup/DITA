@@ -15,19 +15,19 @@
  * limitations under the License.
  */
 
-package org.apache.spark.sql.catalyst.expressions
+package org.apache.spark.sql.catalyst.expressions.dita.common.shape
 
-import org.apache.spark.sql.catalyst.expressions.codegen.CodegenFallback
-import org.apache.spark.sql.types.{DataType, DateType}
+import org.apache.zookeeper.KeeperException.UnimplementedException
 
-case class TrajectorySimilarityFunction(function: String, column1: Expression, column2: Expression)
-  extends BinaryExpression with CodegenFallback {
+/**
+  * Created by zeyuan.shang on 12/25/16.
+  */
+abstract class Shape extends Serializable {
+  def minDist(other: Shape): Double
 
-  override def left: Expression = column1
-  override def right: Expression = column2
+  def approxMinDist(other: Shape): Double = {
+    throw new UnimplementedException
+  }
 
-  override def foldable: Boolean = false
-  override def nullable: Boolean = false
-
-  override def dataType: DataType = DateType
+  def intersects(other: Shape): Boolean
 }

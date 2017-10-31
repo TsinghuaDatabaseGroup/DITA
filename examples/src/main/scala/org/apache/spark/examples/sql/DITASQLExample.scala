@@ -21,16 +21,12 @@ import org.apache.spark.sql.SparkSession
 
 object DITASQLExample {
 
-  case class Point(coord: Array[Double])
-
-  case class Trajectory(points: Array[Point])
-
-  case class TrajectoryRecord(id: Long, traj: Trajectory)
+  case class TrajectoryRecord(id: Long, traj: Array[Array[Double]])
 
   private def getTrajectory(line: (String, Long)): TrajectoryRecord = {
     val points = line._1.split(";").map(_.split(","))
-      .map(x => Point(x.map(_.toDouble)))
-    TrajectoryRecord(line._2, Trajectory(points))
+      .map(x => x.map(_.toDouble))
+    TrajectoryRecord(line._2, points)
   }
 
   def main(args: Array[String]) {
@@ -50,10 +46,7 @@ object DITASQLExample {
     df.createOrReplaceTempView("traj1")
     df.createOrReplaceTempView("traj2")
 
-    val plan = spark.sessionState.sqlParser.parsePlan("SELECT * FROM traj1 JOIN traj2 ON DTW(traj1.traj, traj2.traj) <= 0.005")
-    println(plan)
-    // spark.sql("SELECT * FROM traj1 JOIN traj2 ON traj1.id = traj2.id").show()
-    // spark.sql("SELECT * FROM traj1 JOIN traj2 ON DTW(traj1.traj, traj2.traj) <= 0.005").show()
+    spark.sql("SELECT * FROM traj1 JOIN traj2 ON DTW(traj1.traj, traj2.traj) <= 0.005").show()
 
     spark.stop()
   }
