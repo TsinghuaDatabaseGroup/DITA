@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-package org.apache.spark.examples.sql
+package org.apache.spark.examples.sql.dita
 
 import org.apache.spark.sql.SparkSession
 
