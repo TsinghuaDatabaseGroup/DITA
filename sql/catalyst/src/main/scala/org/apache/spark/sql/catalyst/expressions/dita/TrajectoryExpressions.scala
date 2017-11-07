@@ -25,7 +25,7 @@ import org.apache.spark.sql.catalyst.expressions.dita.common.shape.Point
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.{Trajectory, TrajectorySimilarity}
 import org.apache.spark.sql.types.{ArrayType, DataType, DoubleType}
 
-case class TrajectorySimilarityExpression(function: trajectorySimilarityFunction,
+case class TrajectorySimilarityExpression(function: TrajectorySimilarityFunction,
                                           traj1: Expression, traj2: Expression)
   extends BinaryExpression with CodegenFallback {
 
@@ -36,19 +36,20 @@ case class TrajectorySimilarityExpression(function: trajectorySimilarityFunction
 
   override def nullSafeEval(traj1: Any, traj2: Any): Any = function match {
     case DTW =>
-      val trajectory1 = getTrajectory(traj1.asInstanceOf[UnsafeArrayData])
-      val trajectory2 = getTrajectory(traj2.asInstanceOf[UnsafeArrayData])
+      val trajectory1 = TrajectorySimilarityExpression.getTrajectory(traj1.asInstanceOf[UnsafeArrayData])
+      val trajectory2 = TrajectorySimilarityExpression.getTrajectory(traj2.asInstanceOf[UnsafeArrayData])
       TrajectorySimilarity.DTW.evalWithTrajectory(trajectory1, trajectory2)
-  }
-
-  private def getTrajectory(rawData: UnsafeArrayData): Trajectory = {
-    Trajectory(0L,
-      (0 until rawData.numElements()).map(i => Point(rawData.getArray(i).toDoubleArray)).toArray)
   }
 }
 
-object trajectorySimilarityFunction {
-  def apply(typ: String): trajectorySimilarityFunction =
+object TrajectorySimilarityExpression {
+  def getTrajectory(rawData: UnsafeArrayData): Trajectory = {
+    Trajectory((0 until rawData.numElements()).map(i => Point(rawData.getArray(i).toDoubleArray)).toArray)
+  }
+}
+
+object TrajectorySimilarityFunction {
+  def apply(typ: String): TrajectorySimilarityFunction =
     typ.toLowerCase(Locale.ROOT).replace("_", "") match {
       case "dtw" => DTW
       case _ =>
@@ -59,10 +60,10 @@ object trajectorySimilarityFunction {
     }
 }
 
-sealed abstract class trajectorySimilarityFunction {
+sealed abstract class TrajectorySimilarityFunction {
   def sql: String
 }
 
-case object DTW extends trajectorySimilarityFunction {
+case object DTW extends TrajectorySimilarityFunction {
   override def sql: String = "DTW"
 }

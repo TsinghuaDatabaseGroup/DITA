@@ -30,6 +30,7 @@ import org.apache.spark.sql.catalyst.plans.physical._
 import org.apache.spark.sql.execution
 import org.apache.spark.sql.execution.columnar.{InMemoryRelation, InMemoryTableScanExec}
 import org.apache.spark.sql.execution.command._
+import org.apache.spark.sql.execution.dita.{ExtractTrajectorySimilarityJoin, TrajectorySimilarityJoinExec}
 import org.apache.spark.sql.execution.exchange.ShuffleExchange
 import org.apache.spark.sql.execution.joins.{BuildLeft, BuildRight}
 import org.apache.spark.sql.execution.streaming._
@@ -152,6 +153,10 @@ abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
     }
 
     def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
+
+      // Pick Trajectory Simialrity Join
+      case ExtractTrajectorySimilarityJoin(joinType, leftKey, rightKey, function, threshold, left, right) =>
+        TrajectorySimilarityJoinExec(leftKey, rightKey, function, threshold, planLater(left), planLater(right)) :: Nil
 
       // --- BroadcastHashJoin --------------------------------------------------------------------
 

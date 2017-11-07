@@ -21,11 +21,11 @@ import scala.collection.mutable.ArrayBuffer
 import org.apache.spark.sql.catalyst.expressions.dita.common.ConfigConstants
 import org.apache.spark.sql.catalyst.expressions.dita.common.shape.{Point, Rectangle}
 
-case class Trajectory(id: Long, points: Array[Point]) {
+case class Trajectory(points: Array[Point]) {
   require(points.nonEmpty)
 
   override def toString: String = {
-    s"Trajectory(id = $id, points = ${points.mkString(",")}"
+    s"Trajectory(points = ${points.mkString(",")}"
   }
 
   @transient
@@ -81,13 +81,6 @@ case class Trajectory(id: Long, points: Array[Point]) {
         } else {
           cells.append(ArrayBuffer(point))
         }
-        /*
-        if (cells.last.head.minDist(point) <= cellSize) {
-          cells.last.append(point)
-        } else {
-          cells.append(ArrayBuffer(point))
-        }
-        */
       } else {
         findCells = false
       }
@@ -105,11 +98,6 @@ case class Trajectory(id: Long, points: Array[Point]) {
   }
 
   def refresh(threshold: Double): Unit = {
-    refreshExtendedMBR(threshold)
-    // refreshIndexedCells(threshold)
-  }
-
-  def refreshExtendedMBR(threshold: Double): Unit = {
     extendedMBR = calcExtendedMBR(threshold)
   }
 
