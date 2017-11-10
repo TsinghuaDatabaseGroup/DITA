@@ -14,16 +14,8 @@
  *  limitations under the License.
  */
 
-package org.apache.spark.sql.catalyst.expressions.dita.common.shape
+package org.apache.spark.sql.execution.dita.partition
 
-import org.apache.zookeeper.KeeperException.UnimplementedException
+import org.apache.spark.sql.execution.dita.index.LocalIndex
 
-abstract class Shape extends Serializable {
-  def minDist(other: Shape): Double
-
-  def approxMinDist(other: Shape): Double = {
-    throw new UnimplementedException
-  }
-
-  def intersects(other: Shape): Boolean
-}
+case class PackedPartition(id: Int, data: Array[_ <: Any], indexes: Array[LocalIndex])
