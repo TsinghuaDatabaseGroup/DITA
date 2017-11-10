@@ -21,12 +21,12 @@ import org.apache.spark.sql.execution.dita.index.LocalIndex
 import org.apache.spark.sql.execution.dita.partition.local.LocalTriePartitioner
 
 case class LocalTrieIndex(partitioner: LocalTriePartitioner) extends LocalIndex {
-  def getCandidatesWithThreshold(key: Trajectory, threshold: Double): List[Trajectory] = {
-    partitioner.getCandidatesWithThreshold(key, threshold, 0.0).filter(_._2 <= threshold).map(_._1)
+  def getCandidates(key: Trajectory, threshold: Double): List[Trajectory] = {
+    partitioner.getCandidates(key, threshold, 0.0).filter(_._2 <= threshold).map(_._1)
   }
 
   /*
-  def getCandidatesWithThreshold(key: Shape, threshold: Double): List[Trajectory] = {
+  def getCandidates(key: Shape, threshold: Double): List[Trajectory] = {
     partitioner.getCandidates(key, threshold)
   }
   */

@@ -29,8 +29,8 @@ case class LocalTriePartitioner(partitioner: STRPartitioner,
   extends TriePartitioner(partitioner, childPartitioners, level) {
   override def indexedPivotCount: Int = ConfigConstants.LOCAL_INDEXED_PIVOT_COUNT
 
-  def getCandidatesWithThreshold(key: Any, threshold: Double,
-                                 distanceAccu: Double): List[(Trajectory, Double)] = {
+  def getCandidates(key: Any, threshold: Double,
+                    distanceAccu: Double): List[(Trajectory, Double)] = {
     val k = TriePartitioner.getSearchKey(key)
     val distanceFunction = ConfigConstants.DISTANCE_FUNCTION
 
@@ -53,7 +53,7 @@ case class LocalTriePartitioner(partitioner: STRPartitioner,
               val distance = shape.minDist(k.head)
               val newDistanceAccu = distanceFunction.updateDistance(distanceAccu, distance)
               val newThreshold = distanceFunction.updateThreshold(threshold, distance)
-              childPartitioners(x).getCandidatesWithThreshold(k.tail, newThreshold, newDistanceAccu)
+              childPartitioners(x).getCandidates(k.tail, newThreshold, newDistanceAccu)
             }
           }
         } else {
@@ -69,7 +69,7 @@ case class LocalTriePartitioner(partitioner: STRPartitioner,
               if (childPartitioners.isEmpty) {
                 data.get(x).map((_, newDistanceAccu))
               } else {
-                childPartitioners(x).getCandidatesWithThreshold(newK, newThreshold, newDistanceAccu)
+                childPartitioners(x).getCandidates(newK, newThreshold, newDistanceAccu)
               }
             }
           }
@@ -89,7 +89,7 @@ case class LocalTriePartitioner(partitioner: STRPartitioner,
                 data.get(x).map((_, newDistanceAccu))
               } else {
                 val newThreshold = distanceFunction.updateThreshold(threshold, distance)
-                childPartitioners(x).getCandidatesWithThreshold(k.tail,
+                childPartitioners(x).getCandidates(k.tail,
                   newThreshold, newDistanceAccu)
               }
             }
@@ -110,7 +110,7 @@ case class LocalTriePartitioner(partitioner: STRPartitioner,
                 data.get(x).map((_, newDistanceAccu))
               } else {
                 val newThreshold = distanceFunction.updateThreshold(threshold, distance)
-                childPartitioners(x).getCandidatesWithThreshold(k,
+                childPartitioners(x).getCandidates(k,
                   newThreshold, newDistanceAccu)
               }
             }
@@ -123,10 +123,15 @@ case class LocalTriePartitioner(partitioner: STRPartitioner,
 class EmptyLocalTriePartitioner(override val level: Int,
                                      override val count: Int,
                                      allData: List[Trajectory])
-  extends LocalTriePartitioner(null, null, level, count: Int, data = None) {
+  extends LocalTriePartitioner(null, Array.empty[LocalTriePartitioner],
+    level, count: Int, data = None) {
 
-  override def getCandidatesWithThreshold(key: Any, threshold: Double,
-                                 distanceAccu: Double): List[(Trajectory, Double)] = {
+  override def numPartitions: Int = 1
+
+  override def getPartition(key: Any): Int = 0
+
+  override def getCandidates(key: Any, threshold: Double,
+                             distanceAccu: Double): List[(Trajectory, Double)] = {
     allData.map((_, distanceAccu))
   }
 }
@@ -163,15 +168,20 @@ object LocalTriePartitioner {
     }
   }
 
-  def partition(originRDD: Array[Trajectory]): (Array[Array[Trajectory]], LocalTriePartitioner) = {
+  def partition(data: Array[Trajectory]):
+  (Array[Array[Trajectory]], LocalTriePartitioner) = {
     // get tree partitioner
-    val points = originRDD.map(x => (TriePartitioner.getIndexedKey(x), x))
+    val points = data.map(x => (TriePartitioner.getIndexedKey(x), x))
     val totalLevels = ConfigConstants.LOCAL_INDEXED_PIVOT_COUNT + 2
+    if (points.isEmpty) {
+      return (Array.empty[Array[Trajectory]],
+        new EmptyLocalTriePartitioner(totalLevels, 0, List.empty[Trajectory]))
+    }
     val dimension = points.take(1).head._1.head.coord.length
     val partitioner = partitionByLevel(points, dimension, totalLevels)
 
     // shuffle
-    val shuffled = originRDD.groupBy(t => partitioner.getPartition(t))
+    val shuffled = data.groupBy(t => partitioner.getPartition(t))
     ((0 until partitioner.numPartitions).map(i =>
       shuffled.getOrElse(i, Array.empty)).toArray, partitioner)
   }

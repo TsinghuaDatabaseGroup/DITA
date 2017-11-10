@@ -46,8 +46,8 @@ abstract class TriePartitioner(partitioner: STRPartitioner,
     }
   }
 
-  def getPartitionsWithThreshold(key: Any, threshold: Double,
-                                 distanceAccu: Double): List[(Int, Double)] = {
+  def getPartitions(key: Any, threshold: Double,
+                    distanceAccu: Double): List[(Int, Double)] = {
     val k = TriePartitioner.getSearchKey(key)
     val distanceFunction = ConfigConstants.DISTANCE_FUNCTION
 
@@ -66,7 +66,7 @@ abstract class TriePartitioner(partitioner: STRPartitioner,
               val distance = shape.minDist(k.head)
               val newDistanceAccu = distanceFunction.updateDistance(distanceAccu, distance)
               val newThreshold = distanceFunction.updateThreshold(threshold, distance)
-              childPartitioners(x).getPartitionsWithThreshold(k.tail, newThreshold, newDistanceAccu)
+              childPartitioners(x).getPartitions(k.tail, newThreshold, newDistanceAccu)
                 .map(y => (totalPartitions(x) + y._1, y._2))
             }.filter(_._2 <= threshold)
           }
@@ -83,7 +83,7 @@ abstract class TriePartitioner(partitioner: STRPartitioner,
                 List((x, newDistanceAccu))
               } else {
                 val newThreshold = distanceFunction.updateThreshold(threshold, distance)
-                val ys = childPartitioners(x).getPartitionsWithThreshold(newK,
+                val ys = childPartitioners(x).getPartitions(newK,
                   newThreshold, newDistanceAccu)
                 ys.map(y => (totalPartitions(x) + y._1, y._2))
               }
@@ -105,7 +105,7 @@ abstract class TriePartitioner(partitioner: STRPartitioner,
                 List((x, newDistanceAccu))
               } else {
                 val newThreshold = distanceFunction.updateThreshold(threshold, distance)
-                val ys = childPartitioners(x).getPartitionsWithThreshold(k.tail,
+                val ys = childPartitioners(x).getPartitions(k.tail,
                   newThreshold, newDistanceAccu)
                 ys.filter(_._1 != -1).map(y => (totalPartitions(x) + y._1, y._2))
               }
@@ -127,7 +127,7 @@ abstract class TriePartitioner(partitioner: STRPartitioner,
                 List((x, newDistanceAccu))
               } else {
                 val newThreshold = distanceFunction.updateThreshold(threshold, distance)
-                val ys = childPartitioners(x).getPartitionsWithThreshold(k,
+                val ys = childPartitioners(x).getPartitions(k,
                   newThreshold, newDistanceAccu)
                 ys.filter(_._1 != -1).map(y => (totalPartitions(x) + y._1, y._2))
               }

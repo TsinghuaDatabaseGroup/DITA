@@ -29,7 +29,7 @@ import org.apache.spark.sql.execution.dita.partition.PackedPartition
 import org.apache.spark.sql.execution.dita.partition.global.GlobalTriePartitioner
 import org.apache.spark.storage.StorageLevel
 
-case class TrieRDD(dataRDD: RDD[Trajectory]) {
+class TrieRDD(dataRDD: RDD[Trajectory]) {
   val LOG: Logger = LoggerFactory.getLogger(getClass)
 
   var packedRDD: RDD[PackedPartition] = _

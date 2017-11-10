@@ -17,7 +17,7 @@
 package org.apache.spark.examples.sql.dita
 
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.expressions.dita.DTW
+import org.apache.spark.sql.catalyst.expressions.dita.TrajectorySimilarityFunction
 
 object DITADataFrameExample {
 
@@ -49,7 +49,7 @@ object DITADataFrameExample {
       .zipWithIndex().map(getTrajectory)
       .toDF()
 
-    df1.trajSimJoin(df2, df1("traj"), df2("traj"), DTW, 0.005).show()
+    df1.trajSimJoin(df2, df1("traj"), df2("traj"), TrajectorySimilarityFunction.DTW, 0.005).show()
 
     spark.stop()
   }

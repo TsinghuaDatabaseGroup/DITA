@@ -31,8 +31,8 @@ object ConfigConstants {
   val LOCAL_MAX_ENTRIES_PER_NODE = 20
 
   // global
-  var GLOBAL_NUM_PARTITIONS = 32
-  var GLOBAL_INDEXED_PIVOT_COUNT: Int = 1
+  var GLOBAL_NUM_PARTITIONS = 8
+  var GLOBAL_INDEXED_PIVOT_COUNT: Int = 0
   var GLOBAL_PIVOT_NUM_PARTITIONS = 2
 
   // local

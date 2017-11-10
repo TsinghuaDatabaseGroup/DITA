@@ -22,10 +22,10 @@ import org.apache.spark.sql.execution.dita.partition.global.GlobalTriePartitione
 
 case class GlobalTrieIndex(partitioner: GlobalTriePartitioner) extends GlobalIndex {
   def getPartitions(key: Trajectory, threshold: Double): List[Int] = {
-    partitioner.getPartitionsWithThreshold(key, threshold, 0.0).map(_._1)
+    partitioner.getPartitions(key, threshold, 0.0).map(_._1)
   }
 
   def getPartitionsWithDistances(key: Trajectory, threshold: Double): List[(Int, Double)] = {
-    partitioner.getPartitionsWithThreshold(key, threshold, 0.0)
+    partitioner.getPartitions(key, threshold, 0.0)
   }
 }

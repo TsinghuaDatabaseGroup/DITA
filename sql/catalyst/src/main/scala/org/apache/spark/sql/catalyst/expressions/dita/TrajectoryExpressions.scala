@@ -34,20 +34,37 @@ case class TrajectorySimilarityExpression(function: TrajectorySimilarityFunction
   override def dataType: DataType = DoubleType
 
   override def nullSafeEval(traj1: Any, traj2: Any): Any = function match {
-    case DTW =>
-      val trajectory1 = TrajectorySimilarityExpression.getTrajectory(traj1.asInstanceOf[UnsafeArrayData])
-      val trajectory2 = TrajectorySimilarityExpression.getTrajectory(traj2.asInstanceOf[UnsafeArrayData])
+    case TrajectorySimilarityFunction.DTW =>
+      val trajectory1 = TrajectorySimilarityExpression.getTrajectory(
+        traj1.asInstanceOf[UnsafeArrayData])
+      val trajectory2 = TrajectorySimilarityExpression.getTrajectory(
+        traj2.asInstanceOf[UnsafeArrayData])
       TrajectorySimilarity.DTWDistance.evalWithTrajectory(trajectory1, trajectory2)
   }
 }
 
 object TrajectorySimilarityExpression {
+  def getPoints(rawData: UnsafeArrayData): Array[Point] = {
+    (0 until rawData.numElements()).map(i =>
+      Point(rawData.getArray(i).toDoubleArray)).toArray
+  }
+
   def getTrajectory(rawData: UnsafeArrayData): Trajectory = {
-    Trajectory((0 until rawData.numElements()).map(i => Point(rawData.getArray(i).toDoubleArray)).toArray)
+    Trajectory((0 until rawData.numElements()).map(i =>
+      Point(rawData.getArray(i).toDoubleArray)).toArray)
   }
 }
 
+sealed abstract class TrajectorySimilarityFunction {
+  def sql: String
+}
+
 object TrajectorySimilarityFunction {
+
+  case object DTW extends TrajectorySimilarityFunction {
+    override def sql: String = "DTW"
+  }
+
   def apply(typ: String): TrajectorySimilarityFunction =
     typ.toLowerCase(Locale.ROOT).replace("_", "") match {
       case "dtw" => DTW
@@ -57,12 +74,4 @@ object TrajectorySimilarityFunction {
           "Supported trajectory similarity functions include: "
           + supported.mkString("'", "', '", "'") + ".")
     }
-}
-
-sealed abstract class TrajectorySimilarityFunction {
-  def sql: String
-}
-
-case object DTW extends TrajectorySimilarityFunction {
-  override def sql: String = "DTW"
 }
