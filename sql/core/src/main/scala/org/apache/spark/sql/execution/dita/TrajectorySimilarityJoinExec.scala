@@ -16,14 +16,17 @@
 
 package org.apache.spark.sql.execution.dita
 
-import org.apache.spark.{Accumulable, SparkContext}
+import scala.collection.mutable.{HashMap, HashSet}
+
+import org.apache.spark.Accumulable
 import org.apache.spark.rdd.{PartitionPruningRDD, RDD}
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Expression, JoinedRow, Literal, UnsafeArrayData, UnsafeRow}
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeRowJoiner
+import org.apache.spark.sql.catalyst.expressions.dita.{TrajectorySimilarityExpression, TrajectorySimilarityFunction}
 import org.apache.spark.sql.catalyst.expressions.dita.common.ConfigConstants
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.{Trajectory, TrajectorySimilarity}
-import org.apache.spark.sql.catalyst.expressions.dita.{TrajectorySimilarityExpression, TrajectorySimilarityFunction}
-import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Expression, JoinedRow, Literal, UnsafeArrayData, UnsafeRow}
+import org.apache.spark.sql.execution.{BinaryExecNode, SparkPlan}
 import org.apache.spark.sql.execution.dita.index.global.GlobalTrieIndex
 import org.apache.spark.sql.execution.dita.index.local.LocalTrieIndex
 import org.apache.spark.sql.execution.dita.partition.PackedPartition
@@ -31,10 +34,7 @@ import org.apache.spark.sql.execution.dita.partition.global.ExactKeyPartitioner
 import org.apache.spark.sql.execution.dita.rdd.TrieRDD
 import org.apache.spark.sql.execution.dita.util.{DITAIternalRow, HashMapParam}
 import org.apache.spark.sql.execution.joins.UnsafeCartesianRDD
-import org.apache.spark.sql.execution.{BinaryExecNode, SparkPlan}
 import org.apache.spark.util.SizeEstimator
-
-import scala.collection.mutable.{HashMap, HashSet}
 
 
 case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expression,
@@ -368,13 +368,15 @@ case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expressio
 
       val balancingLeftDataRDD = balancingPartitionsWithIndex.map
       { case (partitionIdx, (balancingPartitionIdx, balancingCount)) =>
-        new PartitionPruningRDD(leftTrieRDD.packedRDD, _ == partitionIdx).flatMap(packedPartition => {
+        new PartitionPruningRDD(leftTrieRDD.packedRDD, _ == partitionIdx)
+          .flatMap(packedPartition => {
           (0 until balancingCount).map(i => (balancingPartitionIdx + i, packedPartition))
         })
       }
       val balancingLeftRDD = ExactKeyPartitioner.partition(
         balancingLeftDataRDD.reduce((x, y) => x.union(y)), balancingPartitionCount)
-      val balancingAnswerRDD = balancingLeftRDD.zipPartitions(balancingPartitionedRightCandidatesRDD)
+      val balancingAnswerRDD = balancingLeftRDD
+        .zipPartitions(balancingPartitionedRightCandidatesRDD)
       { case (partitionIter, trajectoryIter) =>
         localJoin(partitionIter, trajectoryIter, distanceFunction, threshold)
       }
