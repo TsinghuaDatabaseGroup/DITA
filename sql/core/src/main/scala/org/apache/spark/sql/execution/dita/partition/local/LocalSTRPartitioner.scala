@@ -16,7 +16,7 @@
 
 package org.apache.spark.sql.execution.dita.partition.local
 
-import org.apache.spark.sql.catalyst.expressions.dita.common.ConfigConstants
+import org.apache.spark.sql.catalyst.expressions.dita.common.DITAConfigConstants
 import org.apache.spark.sql.catalyst.expressions.dita.common.shape.Point
 import org.apache.spark.sql.execution.dita.partition.{Bounds, STRPartitioner}
 import org.apache.spark.util.SizeEstimator
@@ -53,7 +53,7 @@ case class LocalSTRPartitioner(expectedNumPartitions: Int,
 }
 
 object LocalSTRPartitioner {
-  private val maxEntriesPerNode = ConfigConstants.LOCAL_MAX_ENTRIES_PER_NODE
+  private val maxEntriesPerNode = DITAConfigConstants.LOCAL_MAX_ENTRIES_PER_NODE
 
   def partition[T](data: Array[(Point, T)], dimension: Int, expectedNumPartitions: Int):
   (Array[Array[(Point, T)]], LocalSTRPartitioner) = {

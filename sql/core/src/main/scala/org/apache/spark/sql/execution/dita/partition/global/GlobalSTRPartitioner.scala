@@ -17,7 +17,7 @@
 package org.apache.spark.sql.execution.dita.partition.global
 
 import org.apache.spark.rdd.{RDD, ShuffledRDD}
-import org.apache.spark.sql.catalyst.expressions.dita.common.ConfigConstants
+import org.apache.spark.sql.catalyst.expressions.dita.common.DITAConfigConstants
 import org.apache.spark.sql.catalyst.expressions.dita.common.shape.Point
 import org.apache.spark.sql.execution.dita.partition.{Bounds, STRPartitioner}
 import org.apache.spark.util.SizeEstimator
@@ -66,10 +66,10 @@ case class GlobalSTRPartitioner(expectedNumPartitions: Int,
 }
 
 object GlobalSTRPartitioner {
-  private val sampleRate = ConfigConstants.SAMPLE_RATE
-  private val minSampleSize = ConfigConstants.MIN_SAMPLE_SIZE
-  private val maxSampleSize = ConfigConstants.MAX_SAMPLE_SIZE
-  private val maxEntriesPerNode = ConfigConstants.GLOBAL_MAX_ENTRIES_PER_NODE
+  private val sampleRate = DITAConfigConstants.SAMPLE_RATE
+  private val minSampleSize = DITAConfigConstants.MIN_SAMPLE_SIZE
+  private val maxSampleSize = DITAConfigConstants.MAX_SAMPLE_SIZE
+  private val maxEntriesPerNode = DITAConfigConstants.GLOBAL_MAX_ENTRIES_PER_NODE
 
   def partitionRDD(dataRDD: RDD[Point], dimension: Int, expectedNumPartitions: Int):
   (RDD[Point], GlobalSTRPartitioner) = {

@@ -18,10 +18,11 @@ package org.apache.spark.sql.catalyst.expressions.dita.common
 
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.TrajectorySimilarity
 
-object ConfigConstants {
+object DITAConfigConstants {
   // basic
   val THRESHOLD_LIMIT = 100.0
   val DISTANCE_FUNCTION: TrajectorySimilarity = TrajectorySimilarity.DTWDistance
+  val TRAJECTORY_MIN_LENGTH = 6
 
   // rtree
   val SAMPLE_RATE = 0.05

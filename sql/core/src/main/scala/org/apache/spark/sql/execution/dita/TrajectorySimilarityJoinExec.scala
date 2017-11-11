@@ -19,12 +19,13 @@ package org.apache.spark.sql.execution.dita
 import scala.collection.mutable.{HashMap, HashSet}
 
 import org.apache.spark.Accumulable
+import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.{PartitionPruningRDD, RDD}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Expression, JoinedRow, Literal, UnsafeArrayData, UnsafeRow}
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeRowJoiner
 import org.apache.spark.sql.catalyst.expressions.dita.{TrajectorySimilarityExpression, TrajectorySimilarityFunction}
-import org.apache.spark.sql.catalyst.expressions.dita.common.ConfigConstants
+import org.apache.spark.sql.catalyst.expressions.dita.common.DITAConfigConstants
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.{Trajectory, TrajectorySimilarity}
 import org.apache.spark.sql.execution.{BinaryExecNode, SparkPlan}
 import org.apache.spark.sql.execution.dita.index.global.GlobalTrieIndex
@@ -34,24 +35,25 @@ import org.apache.spark.sql.execution.dita.partition.global.ExactKeyPartitioner
 import org.apache.spark.sql.execution.dita.rdd.TrieRDD
 import org.apache.spark.sql.execution.dita.util.{DITAIternalRow, HashMapParam}
 import org.apache.spark.sql.execution.joins.UnsafeCartesianRDD
-import org.apache.spark.util.SizeEstimator
 
 
 case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expression,
                                         function: TrajectorySimilarityFunction,
                                         thresholdLiteral: Literal,
-                                        left: SparkPlan, right: SparkPlan) extends BinaryExecNode {
+                                        left: SparkPlan, right: SparkPlan) extends BinaryExecNode with Logging {
   override def output: Seq[Attribute] = left.output ++ right.output
 
   val LAMBDA: Double = 1000.0
-  val MIN_OPTIMIZATION_SIZE: Long = 256 * 1024 * 1024
+  val MIN_OPTIMIZATION_COUNT: Long = 200000
 
   protected override def doExecute(): RDD[InternalRow] = {
     val leftResults = left.execute()
     val rightResults = right.execute()
-    val leftSize = SizeEstimator.estimate(leftResults)
-    val rightSize = SizeEstimator.estimate(rightResults)
-    if (leftSize > MIN_OPTIMIZATION_SIZE || rightSize > MIN_OPTIMIZATION_SIZE) {
+    val leftCount = leftResults.count()
+    val rightCount = rightResults.count()
+    logWarning(s"Data count: $leftCount, $rightCount")
+    if (leftCount > MIN_OPTIMIZATION_COUNT && rightCount > MIN_OPTIMIZATION_COUNT) {
+      logWarning("Applying efficient trajectory similarity join algorithm!")
       val leftRDD = leftResults.map(row =>
         new DITAIternalRow(row, TrajectorySimilarityExpression.getPoints(
           BindReferences.bindReference(leftKey, left.output)
@@ -67,12 +69,15 @@ case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expressio
 
       // TODO: get index if it exists
       val leftTrieRDD = new TrieRDD(leftRDD)
+      logWarning("Building left trie RDD")
       val rightTrieRDD = new TrieRDD(rightRDD)
+      logWarning("Building right trie RDD")
 
       // get answer
       val answerRDD = join(leftTrieRDD, rightTrieRDD, distanceFunction, threshold)
       answerRDD.mapPartitions { iter =>
-        iter.map(x => new JoinedRow(x._1.asInstanceOf[InternalRow], x._2.asInstanceOf[InternalRow]))
+        iter.map(x =>
+          new JoinedRow(x._1.asInstanceOf[DITAIternalRow].row, x._2.asInstanceOf[DITAIternalRow].row))
       }
     } else {
       val spillThreshold = sqlContext.conf.cartesianProductExecBufferSpillThreshold
@@ -89,7 +94,7 @@ case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expressio
 
   private def join(leftTrieRDD: TrieRDD, rightTrieRDD: TrieRDD,
                    distanceFunction: TrajectorySimilarity, threshold: Double):
-  RDD[(_ <: Trajectory, _ <: Trajectory)] = {
+  RDD[(Trajectory, Trajectory)] = {
     // basic variables
     val leftNumPartitions = leftTrieRDD.packedRDD.partitions.length
     val rightNumPartitions = rightTrieRDD.packedRDD.partitions.length
@@ -181,7 +186,7 @@ case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expressio
         HashMap.empty[String, Int])(hashMapParam)
 
     // get sampled candidates and compute transmission cost
-    val balancingSampleRate = ConfigConstants.BALANCING_SAMPLE_RATE
+    val balancingSampleRate = DITAConfigConstants.BALANCING_SAMPLE_RATE
     val sampledLeftCandidatesRDD = leftTrieRDD.packedRDD.flatMap(packedPartition =>
       packedPartition.getSample(balancingSampleRate).asInstanceOf[List[Trajectory]].flatMap(t => {
         val candidatePartitionIdxs = bRightGlobalTrieIndex.value.getPartitions(t, threshold)
@@ -285,7 +290,7 @@ case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expressio
 
     // balancing
     var standardValueForBalancing =
-      totalCost((totalNumPartitions * ConfigConstants.BALANCING_PERCENTILE).toInt)._2
+      totalCost((totalNumPartitions * DITAConfigConstants.BALANCING_PERCENTILE).toInt)._2
     if (standardValueForBalancing == 0) {
       standardValueForBalancing = Int.MaxValue
     }
@@ -389,14 +394,11 @@ case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expressio
                         trajectoryIter: Iterator[Trajectory],
                         distanceFunction: TrajectorySimilarity,
                         threshold: Double): Iterator[(Trajectory, Trajectory)] = {
-    val start = System.currentTimeMillis()
-
     val packedPartition = partitionIter.next()
     val localTreeIndex = packedPartition.indexes.filter(_.isInstanceOf[LocalTrieIndex]).head
       .asInstanceOf[LocalTrieIndex]
     val queryTrajectories = trajectoryIter.toList
     queryTrajectories.foreach(_.refresh(threshold))
-    val dataEnd = System.currentTimeMillis()
 
     val answerPairs = queryTrajectories.flatMap(query => {
       val indexCandidates = localTreeIndex.getCandidates(query, threshold)

@@ -16,10 +16,11 @@
 
 package org.apache.spark.sql.execution.dita.partition.local
 
-import org.apache.spark.sql.catalyst.expressions.dita.common.ConfigConstants
+import org.apache.spark.sql.catalyst.expressions.dita.common.DITAConfigConstants
 import org.apache.spark.sql.catalyst.expressions.dita.common.shape.Point
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.Trajectory
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.TrajectorySimilarity.{DTWDistance, EDRDistance, FrechetDistance, LCSSDistance}
+import org.apache.spark.sql.execution.dita.partition.global.GlobalTriePartitioner
 import org.apache.spark.sql.execution.dita.partition.{STRPartitioner, TriePartitioner}
 
 case class LocalTriePartitioner(partitioner: STRPartitioner,
@@ -27,14 +28,25 @@ case class LocalTriePartitioner(partitioner: STRPartitioner,
                                 level: Int,
                                 count: Int, data: Option[Array[List[Trajectory]]])
   extends TriePartitioner(partitioner, childPartitioners, level) {
-  override def indexedPivotCount: Int = ConfigConstants.LOCAL_INDEXED_PIVOT_COUNT
+  override def indexedPivotCount: Int = DITAConfigConstants.LOCAL_INDEXED_PIVOT_COUNT
+
+  override def getPartition(key: Any): Int = {
+    val k = LocalTriePartitioner.getIndexedKey(key)
+    val x = partitioner.getPartition(k.head)
+    if (childPartitioners.nonEmpty) {
+      val y = childPartitioners(x).getPartition(k.tail)
+      totalPartitions(x) + y
+    } else {
+      x
+    }
+  }
 
   def getCandidates(key: Any, threshold: Double,
                     distanceAccu: Double): List[(Trajectory, Double)] = {
     val k = TriePartitioner.getSearchKey(key)
-    val distanceFunction = ConfigConstants.DISTANCE_FUNCTION
+    val distanceFunction = DITAConfigConstants.DISTANCE_FUNCTION
 
-    if (count <= ConfigConstants.LOCAL_MIN_NODE_SIZE) {
+    if (count <= DITAConfigConstants.LOCAL_MIN_NODE_SIZE) {
       return data.get.flatten.toList.map((_, threshold))
     }
 
@@ -59,7 +71,7 @@ case class LocalTriePartitioner(partitioner: STRPartitioner,
         } else {
           partitioner.mbrBounds.toList.flatMap{ case (shape, x) =>
             val newK = k.dropWhile(p => shape.approxMinDist(p) > threshold)
-            val distance = if (newK.isEmpty) ConfigConstants.THRESHOLD_LIMIT
+            val distance = if (newK.isEmpty) DITAConfigConstants.THRESHOLD_LIMIT
             else newK.map(p => shape.approxMinDist(p)).min
             val newDistanceAccu = distanceFunction.updateDistance(distanceAccu, distance)
             if (newDistanceAccu > threshold) {
@@ -137,15 +149,40 @@ class EmptyLocalTriePartitioner(override val level: Int,
 }
 
 object LocalTriePartitioner {
+  def partition(data: Array[Trajectory]):
+  (Array[Array[Trajectory]], LocalTriePartitioner) = {
+    // get tree partitioner
+    val points = data.map(x => (LocalTriePartitioner.getIndexedKey(x), x))
+    val totalLevels = DITAConfigConstants.LOCAL_INDEXED_PIVOT_COUNT + 2
+    if (points.isEmpty) {
+      return (Array.empty[Array[Trajectory]],
+        new EmptyLocalTriePartitioner(totalLevels, 0, List.empty[Trajectory]))
+    }
+    val dimension = points.take(1).head._1.head.coord.length
+    val partitioner = partitionByLevel(points, dimension, totalLevels)
+
+    // shuffle
+    val shuffled = data.groupBy(t => partitioner.getPartition(t))
+    ((0 until partitioner.numPartitions).map(i =>
+      shuffled.getOrElse(i, Array.empty)).toArray, partitioner)
+  }
+
+  private def getIndexedKey(key: Any): Array[Point] = {
+    key match {
+      case t: Trajectory => t.points.head +: t.points.last +: t.getLocalIndexedPivot
+      case _ => key.asInstanceOf[Array[Point]]
+    }
+  }
+
   private def partitionByLevel(rdd: Array[(Array[Point], Trajectory)],
                                dimension: Int, level: Int): LocalTriePartitioner = {
-    val numPartitions = if (level > ConfigConstants.LOCAL_INDEXED_PIVOT_COUNT) {
-      ConfigConstants.LOCAL_NUM_PARTITIONS
+    val numPartitions = if (level > DITAConfigConstants.LOCAL_INDEXED_PIVOT_COUNT) {
+      DITAConfigConstants.LOCAL_NUM_PARTITIONS
     } else {
-      ConfigConstants.LOCAL_PIVOT_NUM_PARTITIONS
+      DITAConfigConstants.LOCAL_PIVOT_NUM_PARTITIONS
     }
 
-    if (rdd.length <= ConfigConstants.LOCAL_MIN_NODE_SIZE) {
+    if (rdd.length <= DITAConfigConstants.LOCAL_MIN_NODE_SIZE) {
       return new EmptyLocalTriePartitioner(level, rdd.length, rdd.map(_._2).toList)
     }
 
@@ -166,23 +203,5 @@ object LocalTriePartitioner {
       LocalTriePartitioner(partitioner, Array.empty, level,
         rdd.length, Some(partitionedData.map(x => x.map(_._2).toList)))
     }
-  }
-
-  def partition(data: Array[Trajectory]):
-  (Array[Array[Trajectory]], LocalTriePartitioner) = {
-    // get tree partitioner
-    val points = data.map(x => (TriePartitioner.getIndexedKey(x), x))
-    val totalLevels = ConfigConstants.LOCAL_INDEXED_PIVOT_COUNT + 2
-    if (points.isEmpty) {
-      return (Array.empty[Array[Trajectory]],
-        new EmptyLocalTriePartitioner(totalLevels, 0, List.empty[Trajectory]))
-    }
-    val dimension = points.take(1).head._1.head.coord.length
-    val partitioner = partitionByLevel(points, dimension, totalLevels)
-
-    // shuffle
-    val shuffled = data.groupBy(t => partitioner.getPartition(t))
-    ((0 until partitioner.numPartitions).map(i =>
-      shuffled.getOrElse(i, Array.empty)).toArray, partitioner)
   }
 }

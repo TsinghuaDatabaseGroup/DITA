@@ -16,10 +16,8 @@
 
 package org.apache.spark.sql.execution.dita.partition.global
 
-import org.slf4j.{Logger, LoggerFactory}
-
 import org.apache.spark.rdd.{RDD, ShuffledRDD}
-import org.apache.spark.sql.catalyst.expressions.dita.common.ConfigConstants
+import org.apache.spark.sql.catalyst.expressions.dita.common.DITAConfigConstants
 import org.apache.spark.sql.catalyst.expressions.dita.common.shape.Point
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.Trajectory
 import org.apache.spark.sql.execution.dita.partition.{STRPartitioner, TriePartitioner}
@@ -28,20 +26,47 @@ case class GlobalTriePartitioner(partitioner: STRPartitioner,
                                  childPartitioners: Array[GlobalTriePartitioner],
                                  level: Int)
   extends TriePartitioner(partitioner, childPartitioners, level) {
+  override def indexedPivotCount: Int = DITAConfigConstants.GLOBAL_INDEXED_PIVOT_COUNT
 
-
-  override def indexedPivotCount: Int = ConfigConstants.GLOBAL_INDEXED_PIVOT_COUNT
+  override def getPartition(key: Any): Int = {
+    val k = GlobalTriePartitioner.getIndexedKey(key)
+    val x = partitioner.getPartition(k.head)
+    if (childPartitioners.nonEmpty) {
+      val y = childPartitioners(x).getPartition(k.tail)
+      totalPartitions(x) + y
+    } else {
+      x
+    }
+  }
 }
 
 object GlobalTriePartitioner {
-  private val LOG: Logger = LoggerFactory.getLogger(getClass)
+  def partition(dataRDD: RDD[Trajectory]): (RDD[Trajectory], GlobalTriePartitioner) = {
+    // get tree partitioner
+    val points = dataRDD.map(GlobalTriePartitioner.getIndexedKey)
+    val totalLevels = DITAConfigConstants.GLOBAL_INDEXED_PIVOT_COUNT + 2
+    val dimension = points.take(1).head.head.coord.length
+    val partitioner = partitionByLevel(points, dimension, totalLevels)
+
+    // shuffle
+    val pairedDataRDD = dataRDD.map(x => (x, None))
+    val shuffled = new ShuffledRDD[Trajectory, Any, Any](pairedDataRDD, partitioner)
+    (shuffled.map(_._1), partitioner)
+  }
+
+  private def getIndexedKey(key: Any): Array[Point] = {
+    key match {
+      case t: Trajectory => t.points.head +: t.points.last +: t.getGlobalIndexedPivot
+      case _ => key.asInstanceOf[Array[Point]]
+    }
+  }
 
   private def partitionByLevel(rdd: RDD[Array[Point]],
                                dimension: Int, level: Int): GlobalTriePartitioner = {
-    val numPartitions = if (level > ConfigConstants.GLOBAL_INDEXED_PIVOT_COUNT) {
-      ConfigConstants.GLOBAL_NUM_PARTITIONS
+    val numPartitions = if (level > DITAConfigConstants.GLOBAL_INDEXED_PIVOT_COUNT) {
+      DITAConfigConstants.GLOBAL_NUM_PARTITIONS
     } else {
-      ConfigConstants.GLOBAL_PIVOT_NUM_PARTITIONS
+      DITAConfigConstants.GLOBAL_PIVOT_NUM_PARTITIONS
     }
 
     if (level > 1) {
@@ -63,18 +88,5 @@ object GlobalTriePartitioner {
 
       GlobalTriePartitioner(partitioner, Array.empty, level)
     }
-  }
-
-  def partition(dataRDD: RDD[Trajectory]): (RDD[Trajectory], GlobalTriePartitioner) = {
-    // get tree partitioner
-    val points = dataRDD.map(TriePartitioner.getIndexedKey)
-    val totalLevels = ConfigConstants.GLOBAL_INDEXED_PIVOT_COUNT + 2
-    val dimension = points.take(1).head.head.coord.length
-    val partitioner = partitionByLevel(points, dimension, totalLevels)
-
-    // shuffle
-    val pairedDataRDD = dataRDD.map(x => (x, None))
-    val shuffled = new ShuffledRDD[Trajectory, Any, Any](pairedDataRDD, partitioner)
-    (shuffled.map(_._1), partitioner)
   }
 }

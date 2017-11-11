@@ -17,6 +17,7 @@
 package org.apache.spark.examples.sql.dita
 
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.catalyst.expressions.dita.common.DITAConfigConstants
 
 object DITASQLExample {
 
@@ -39,13 +40,20 @@ object DITASQLExample {
     import spark.implicits._
 
     val df = spark.sparkContext
-      .textFile("examples/src/main/resources/trajectory.txt")
+      // .textFile("examples/src/main/resources/trajectory.txt")
+      .textFile("examples/src/main/resources/trajectory_big.txt")
       .zipWithIndex().map(getTrajectory)
+      .filter(_.traj.length >= DITAConfigConstants.TRAJECTORY_MIN_LENGTH)
       .toDF()
     df.createOrReplaceTempView("traj1")
     df.createOrReplaceTempView("traj2")
 
-    spark.sql("SELECT * FROM traj1 JOIN traj2 ON DTW(traj1.traj, traj2.traj) <= 0.005").show()
+    val start = System.currentTimeMillis()
+    spark.sql("SELECT COUNT(*) FROM traj1 JOIN traj2 ON DTW(traj1.traj, traj2.traj) <= 0.001")
+      .show()
+    val end = System.currentTimeMillis()
+
+    println(s"Running time: ${end - start} ms")
 
     spark.stop()
   }

@@ -17,7 +17,7 @@
 package org.apache.spark.sql.execution.dita.partition
 
 import org.apache.spark.Partitioner
-import org.apache.spark.sql.catalyst.expressions.dita.common.ConfigConstants
+import org.apache.spark.sql.catalyst.expressions.dita.common.DITAConfigConstants
 import org.apache.spark.sql.catalyst.expressions.dita.common.shape.Point
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.Trajectory
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.TrajectorySimilarity.{DTWDistance, EDRDistance, FrechetDistance, LCSSDistance}
@@ -35,21 +35,10 @@ abstract class TriePartitioner(partitioner: STRPartitioner,
     totalPartitions.last
   }
 
-  override def getPartition(key: Any): Int = {
-    val k = TriePartitioner.getIndexedKey(key)
-    val x = partitioner.getPartition(k.head)
-    if (childPartitioners.nonEmpty) {
-      val y = childPartitioners(x).getPartition(k.tail)
-      totalPartitions(x) + y
-    } else {
-      x
-    }
-  }
-
   def getPartitions(key: Any, threshold: Double,
                     distanceAccu: Double): List[(Int, Double)] = {
     val k = TriePartitioner.getSearchKey(key)
-    val distanceFunction = ConfigConstants.DISTANCE_FUNCTION
+    val distanceFunction = DITAConfigConstants.DISTANCE_FUNCTION
 
     distanceFunction match {
       case DTWDistance | FrechetDistance =>
@@ -73,7 +62,7 @@ abstract class TriePartitioner(partitioner: STRPartitioner,
         } else {
           partitioner.mbrBounds.toList.flatMap{ case (shape, x) =>
             val newK = k.dropWhile(p => shape.approxMinDist(p) > threshold)
-            val distance = if (newK.isEmpty) ConfigConstants.THRESHOLD_LIMIT
+            val distance = if (newK.isEmpty) DITAConfigConstants.THRESHOLD_LIMIT
             else newK.map(p => shape.minDist(p)).min
             val newDistanceAccu = distanceFunction.updateDistance(distanceAccu, distance)
             if (newDistanceAccu > threshold) {
@@ -139,13 +128,6 @@ abstract class TriePartitioner(partitioner: STRPartitioner,
 }
 
 object TriePartitioner {
-  def getIndexedKey(key: Any): Array[Point] = {
-    key match {
-      case t: Trajectory => t.points.head +: t.points.last +: t.getGlobalIndexedPivot
-      case _ => key.asInstanceOf[Array[Point]]
-    }
-  }
-
   def getSearchKey(key: Any): Array[Point] = {
     key match {
       case t: Trajectory => t.points.head +: t.points.last +: t.points

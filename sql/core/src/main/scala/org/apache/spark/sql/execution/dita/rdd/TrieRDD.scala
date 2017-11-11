@@ -56,21 +56,21 @@ class TrieRDD(dataRDD: RDD[Trajectory]) {
     packedRDD.persist(StorageLevel.MEMORY_AND_DISK_SER)
     packedRDD.count()
     end = System.currentTimeMillis()
-    LOG.info(s"Building Local Index Time: ${end - start} ms")
+    LOG.warn(s"Building Local Index Time: ${end - start} ms")
 
     // log statistics
     val partitionSizes = packedRDD.mapPartitions(iter => iter.map(_.data.length)).collect()
-    LOG.debug(s"Tree Partitions Count: ${partitionSizes.length}")
-    LOG.debug(s"Tree Partitions Sizes: ${partitionSizes.mkString(",")}")
-    LOG.debug(s"Max Partition Size: ${partitionSizes.max}")
-    LOG.debug(s"Min Partition Size: ${partitionSizes.min}")
-    LOG.debug(s"Avg Partition Size: ${partitionSizes.sum / partitionSizes.length}")
+    LOG.warn(s"Tree Partitions Count: ${partitionSizes.length}")
+    LOG.warn(s"Tree Partitions Sizes: ${partitionSizes.mkString(",")}")
+    LOG.warn(s"Max Partition Size: ${partitionSizes.max}")
+    LOG.warn(s"Min Partition Size: ${partitionSizes.min}")
+    LOG.warn(s"Avg Partition Size: ${partitionSizes.sum / partitionSizes.length}")
     val sortedPartitionSizes = partitionSizes.sorted
-    LOG.debug(s"5% Partition Size: ${sortedPartitionSizes((partitionSizes.length * 0.05).toInt)}")
-    LOG.debug(s"25% Partition Size: ${sortedPartitionSizes((partitionSizes.length * 0.25).toInt)}")
-    LOG.debug(s"50% Partition Size: ${sortedPartitionSizes((partitionSizes.length * 0.5).toInt)}")
-    LOG.debug(s"75% Partition Size: ${sortedPartitionSizes((partitionSizes.length * 0.75).toInt)}")
-    LOG.debug(s"95% Partition Size: ${sortedPartitionSizes((partitionSizes.length * 0.95).toInt)}")
+    LOG.warn(s"5% Partition Size: ${sortedPartitionSizes((partitionSizes.length * 0.05).toInt)}")
+    LOG.warn(s"25% Partition Size: ${sortedPartitionSizes((partitionSizes.length * 0.25).toInt)}")
+    LOG.warn(s"50% Partition Size: ${sortedPartitionSizes((partitionSizes.length * 0.5).toInt)}")
+    LOG.warn(s"75% Partition Size: ${sortedPartitionSizes((partitionSizes.length * 0.75).toInt)}")
+    LOG.warn(s"95% Partition Size: ${sortedPartitionSizes((partitionSizes.length * 0.95).toInt)}")
 
     // build global index
     start = System.currentTimeMillis()
