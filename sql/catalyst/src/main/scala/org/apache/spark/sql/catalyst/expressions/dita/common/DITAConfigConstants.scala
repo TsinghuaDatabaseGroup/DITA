@@ -23,6 +23,7 @@ object DITAConfigConstants {
   val THRESHOLD_LIMIT = 100.0
   val DISTANCE_FUNCTION: TrajectorySimilarity = TrajectorySimilarity.DTWDistance
   val TRAJECTORY_MIN_LENGTH = 6
+  val TRAJECTORY_MAX_LENGTH = 1000
 
   // rtree
   val SAMPLE_RATE = 0.05

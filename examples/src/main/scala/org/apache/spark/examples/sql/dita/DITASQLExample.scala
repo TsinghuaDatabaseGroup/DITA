@@ -16,8 +16,11 @@
 
 package org.apache.spark.examples.sql.dita
 
+import scala.collection.mutable.ArrayBuffer
+
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.expressions.dita.common.DITAConfigConstants
+import org.apache.spark.sql.catalyst.expressions.dita.common.shape.Point
 
 object DITASQLExample {
 
@@ -26,7 +29,17 @@ object DITASQLExample {
   private def getTrajectory(line: (String, Long)): TrajectoryRecord = {
     val points = line._1.split(";").map(_.split(","))
       .map(x => x.map(_.toDouble))
-    TrajectoryRecord(line._2, points)
+
+    val filteredPoints = ArrayBuffer.empty[Point]
+    for (point <- points) {
+      val p = Point(point)
+      if (filteredPoints.isEmpty) {
+        filteredPoints.append(p)
+      } else if (filteredPoints.last.minDist(p) > 0) {
+        filteredPoints.append(p)
+      }
+    }
+    TrajectoryRecord(line._2, filteredPoints.toArray.map(_.coord))
   }
 
   def main(args: Array[String]) {
@@ -44,6 +57,7 @@ object DITASQLExample {
       .textFile("examples/src/main/resources/trajectory_big.txt")
       .zipWithIndex().map(getTrajectory)
       .filter(_.traj.length >= DITAConfigConstants.TRAJECTORY_MIN_LENGTH)
+      .filter(_.traj.length <= DITAConfigConstants.TRAJECTORY_MAX_LENGTH)
       .toDF()
     df.createOrReplaceTempView("traj1")
     df.createOrReplaceTempView("traj2")

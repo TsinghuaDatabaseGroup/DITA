@@ -44,7 +44,7 @@ case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expressio
   override def output: Seq[Attribute] = left.output ++ right.output
 
   val LAMBDA: Double = 1000.0
-  val MIN_OPTIMIZATION_COUNT: Long = 200000
+  val MIN_OPTIMIZATION_COUNT: Long = 10000
 
   protected override def doExecute(): RDD[InternalRow] = {
     val leftResults = left.execute()
@@ -66,6 +66,7 @@ case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expressio
         case TrajectorySimilarityFunction.DTW => TrajectorySimilarity.DTWDistance
       }
       val threshold = thresholdLiteral.value.asInstanceOf[Number].doubleValue()
+      logWarning(s"Threshold $threshold")
 
       // TODO: get index if it exists
       val leftTrieRDD = new TrieRDD(leftRDD)
