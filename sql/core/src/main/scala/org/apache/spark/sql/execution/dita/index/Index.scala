@@ -14,16 +14,8 @@
  *  limitations under the License.
  */
 
-package org.apache.spark.sql.catalyst.expressions.dita.common.shape
+package org.apache.spark.sql.execution.dita.index
 
-import org.apache.zookeeper.KeeperException.UnimplementedException
+trait LocalIndex
 
-abstract class Shape extends Serializable {
-  def minDist(other: Shape): Double
-
-  def approxMinDist(other: Shape): Double = {
-    throw new UnimplementedException
-  }
-
-  def intersects(other: Shape): Boolean
-}
+trait GlobalIndex

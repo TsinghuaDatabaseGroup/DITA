@@ -31,7 +31,7 @@ import org.apache.spark.sql.catalyst.{FunctionIdentifier, TableIdentifier}
 import org.apache.spark.sql.catalyst.analysis._
 import org.apache.spark.sql.catalyst.expressions.{dita, _}
 import org.apache.spark.sql.catalyst.expressions.aggregate.{First, Last}
-import org.apache.spark.sql.catalyst.expressions.dita.TrajectorySimilarityExpression
+import org.apache.spark.sql.catalyst.expressions.dita.{TrajectorySimilarityExpression, TrajectorySimilarityFunction}
 import org.apache.spark.sql.catalyst.parser.SqlBaseParser._
 import org.apache.spark.sql.catalyst.plans._
 import org.apache.spark.sql.catalyst.plans.logical._
@@ -1102,7 +1102,7 @@ class AstBuilder(conf: SQLConf) extends SqlBaseBaseVisitor[AnyRef] with Logging 
     (ctx: TrajectorySimilarityContext): Expression = withOrigin(ctx) {
     ctx.function match {
       case function if function.DTW != null => TrajectorySimilarityExpression(
-        dita.DTW, expression(ctx.left), expression(ctx.right))
+        TrajectorySimilarityFunction.DTW, expression(ctx.left), expression(ctx.right))
     }
   }
 

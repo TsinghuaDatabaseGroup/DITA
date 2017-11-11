@@ -1,18 +1,17 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
+ *  Copyright 2017 by DITA Project
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
  */
 
 package org.apache.spark.sql.catalyst.expressions.dita
@@ -35,20 +34,37 @@ case class TrajectorySimilarityExpression(function: TrajectorySimilarityFunction
   override def dataType: DataType = DoubleType
 
   override def nullSafeEval(traj1: Any, traj2: Any): Any = function match {
-    case DTW =>
-      val trajectory1 = TrajectorySimilarityExpression.getTrajectory(traj1.asInstanceOf[UnsafeArrayData])
-      val trajectory2 = TrajectorySimilarityExpression.getTrajectory(traj2.asInstanceOf[UnsafeArrayData])
-      TrajectorySimilarity.DTW.evalWithTrajectory(trajectory1, trajectory2)
+    case TrajectorySimilarityFunction.DTW =>
+      val trajectory1 = TrajectorySimilarityExpression.getTrajectory(
+        traj1.asInstanceOf[UnsafeArrayData])
+      val trajectory2 = TrajectorySimilarityExpression.getTrajectory(
+        traj2.asInstanceOf[UnsafeArrayData])
+      TrajectorySimilarity.DTWDistance.evalWithTrajectory(trajectory1, trajectory2)
   }
 }
 
 object TrajectorySimilarityExpression {
+  def getPoints(rawData: UnsafeArrayData): Array[Point] = {
+    (0 until rawData.numElements()).map(i =>
+      Point(rawData.getArray(i).toDoubleArray)).toArray
+  }
+
   def getTrajectory(rawData: UnsafeArrayData): Trajectory = {
-    Trajectory((0 until rawData.numElements()).map(i => Point(rawData.getArray(i).toDoubleArray)).toArray)
+    Trajectory((0 until rawData.numElements()).map(i =>
+      Point(rawData.getArray(i).toDoubleArray)).toArray)
   }
 }
 
+sealed abstract class TrajectorySimilarityFunction {
+  def sql: String
+}
+
 object TrajectorySimilarityFunction {
+
+  case object DTW extends TrajectorySimilarityFunction {
+    override def sql: String = "DTW"
+  }
+
   def apply(typ: String): TrajectorySimilarityFunction =
     typ.toLowerCase(Locale.ROOT).replace("_", "") match {
       case "dtw" => DTW
@@ -58,12 +74,4 @@ object TrajectorySimilarityFunction {
           "Supported trajectory similarity functions include: "
           + supported.mkString("'", "', '", "'") + ".")
     }
-}
-
-sealed abstract class TrajectorySimilarityFunction {
-  def sql: String
-}
-
-case object DTW extends TrajectorySimilarityFunction {
-  override def sql: String = "DTW"
 }

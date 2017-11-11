@@ -14,16 +14,15 @@
  *  limitations under the License.
  */
 
-package org.apache.spark.sql.catalyst.expressions.dita.common.shape
+package org.apache.spark.sql.execution.dita.partition
 
-import org.apache.zookeeper.KeeperException.UnimplementedException
+import scala.util.Random
 
-abstract class Shape extends Serializable {
-  def minDist(other: Shape): Double
+import org.apache.spark.sql.execution.dita.index.LocalIndex
 
-  def approxMinDist(other: Shape): Double = {
-    throw new UnimplementedException
+case class PackedPartition(id: Int, data: Array[_ <: Any], indexes: Array[LocalIndex]) {
+
+  def getSample(sampleRate: Double): List[_ <: Any] = {
+    Random.shuffle(data.toList).take((data.length * sampleRate).toInt)
   }
-
-  def intersects(other: Shape): Boolean
 }

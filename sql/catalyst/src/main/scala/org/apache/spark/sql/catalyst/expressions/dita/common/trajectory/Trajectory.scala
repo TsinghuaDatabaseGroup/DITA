@@ -1,24 +1,23 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
+ *  Copyright 2017 by DITA Project
+ *
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
  *
  *    http://www.apache.org/licenses/LICENSE-2.0
  *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
  */
 
 package org.apache.spark.sql.catalyst.expressions.dita.common.trajectory
 
 import scala.collection.mutable.ArrayBuffer
-import org.apache.spark.sql.catalyst.expressions.dita.common.ConfigConstants
+import org.apache.spark.sql.catalyst.expressions.dita.common.DITAConfigConstants
 import org.apache.spark.sql.catalyst.expressions.dita.common.shape.{Point, Rectangle}
 
 case class Trajectory(points: Array[Point]) {
@@ -34,10 +33,10 @@ case class Trajectory(points: Array[Point]) {
   private var extendedMBR: Rectangle = _
   @transient
   private lazy val globalIndexedPivot: Array[Point] =
-    calcPivot(ConfigConstants.GLOBAL_INDEXED_PIVOT_COUNT).map(_._1)
+    calcPivot(DITAConfigConstants.GLOBAL_INDEXED_PIVOT_COUNT).map(_._1)
   @transient
   private lazy val localIndexedPivot: Array[Point] =
-    calcPivot(ConfigConstants.LOCAL_INDEXED_PIVOT_COUNT).map(_._1)
+    calcPivot(DITAConfigConstants.LOCAL_INDEXED_PIVOT_COUNT).map(_._1)
   @transient
   private lazy val cells: Array[(Rectangle, Int)] = calcCells()
   @transient
@@ -69,12 +68,12 @@ case class Trajectory(points: Array[Point]) {
 
   private def calcCells(): Array[(Rectangle, Int)] = {
     val dimension = numDimensions
-    val cellSize = ConfigConstants.LOCAL_CELL_SIZE
+    val cellSize = DITAConfigConstants.LOCAL_CELL_SIZE
     val cells = ArrayBuffer.empty[ArrayBuffer[Point]]
     cells.append(ArrayBuffer(points.head))
     var findCells = true
     for (point <- points.tail) {
-      if (cells.length <= points.length * ConfigConstants.LOCAL_CELL_THRESHOLD) {
+      if (cells.length <= points.length * DITAConfigConstants.LOCAL_CELL_THRESHOLD) {
         val cell = cells.find(x => x.head.approxMinDist(point) <= cellSize)
         if (cell.isDefined) {
           cell.get.append(point)

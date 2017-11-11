@@ -14,16 +14,12 @@
  *  limitations under the License.
  */
 
-package org.apache.spark.sql.catalyst.expressions.dita.common.shape
+package org.apache.spark.sql.execution.dita.util
 
-import org.apache.zookeeper.KeeperException.UnimplementedException
+import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.expressions.dita.common.shape.Point
+import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.Trajectory
 
-abstract class Shape extends Serializable {
-  def minDist(other: Shape): Double
-
-  def approxMinDist(other: Shape): Double = {
-    throw new UnimplementedException
-  }
-
-  def intersects(other: Shape): Boolean
+class DITAIternalRow(internalRow: InternalRow, points: Array[Point]) extends Trajectory(points) {
+  var row: InternalRow = internalRow
 }
