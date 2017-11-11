@@ -16,11 +16,8 @@
 
 package org.apache.spark.examples.sql.dita
 
-import scala.collection.mutable.ArrayBuffer
-
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.expressions.dita.common.DITAConfigConstants
-import org.apache.spark.sql.catalyst.expressions.dita.common.shape.Point
 
 object DITASQLExample {
 
@@ -29,17 +26,7 @@ object DITASQLExample {
   private def getTrajectory(line: (String, Long)): TrajectoryRecord = {
     val points = line._1.split(";").map(_.split(","))
       .map(x => x.map(_.toDouble))
-
-    val filteredPoints = ArrayBuffer.empty[Point]
-    for (point <- points) {
-      val p = Point(point)
-      if (filteredPoints.isEmpty) {
-        filteredPoints.append(p)
-      } else if (filteredPoints.last.minDist(p) > 0) {
-        filteredPoints.append(p)
-      }
-    }
-    TrajectoryRecord(line._2, filteredPoints.toArray.map(_.coord))
+    TrajectoryRecord(line._2, points)
   }
 
   def main(args: Array[String]) {
