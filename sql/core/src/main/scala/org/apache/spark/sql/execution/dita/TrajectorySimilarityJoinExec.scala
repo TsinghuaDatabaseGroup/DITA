@@ -76,10 +76,13 @@ case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expressio
 
       // get answer
       val answerRDD = join(leftTrieRDD, rightTrieRDD, distanceFunction, threshold)
-      answerRDD.mapPartitions { iter =>
+      val outputRDD = answerRDD.mapPartitions { iter =>
         iter.map(x =>
-          new JoinedRow(x._1.asInstanceOf[DITAIternalRow].row, x._2.asInstanceOf[DITAIternalRow].row))
+          new JoinedRow(x._1.asInstanceOf[DITAIternalRow].row,
+            x._2.asInstanceOf[DITAIternalRow].row))
       }
+      val end = System.currentTimeMillis()
+      outputRDD.asInstanceOf[RDD[InternalRow]]
     } else {
       val spillThreshold = sqlContext.conf.cartesianProductExecBufferSpillThreshold
       val pair = new UnsafeCartesianRDD(leftResults.asInstanceOf[RDD[UnsafeRow]],
@@ -99,11 +102,17 @@ case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expressio
     // basic variables
     val leftNumPartitions = leftTrieRDD.packedRDD.partitions.length
     val rightNumPartitions = rightTrieRDD.packedRDD.partitions.length
+    var start = System.currentTimeMillis()
+    var end = System.currentTimeMillis()
 
     // get cost
+    start = System.currentTimeMillis()
     val (transCost, compCost) = getCost(leftTrieRDD, rightTrieRDD, threshold)
+    end = System.currentTimeMillis()
+    logWarning(s"Computing cost time: ${(end - start) / 1000}s")
 
     // construct the graph
+    start = System.currentTimeMillis()
     val totalNumPartitions = leftNumPartitions + rightNumPartitions
     val allEdges = (0 until totalNumPartitions).map(partitionId => {
       val edges = if (partitionId < leftNumPartitions) {
@@ -146,17 +155,20 @@ case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expressio
         None
       }
     })
-    assert(edgeDirection.forall(t => !edgeDirection.contains((t._2, t._1))))
-    assert(left2RightEdges.forall(t => !right2LeftEdges.contains((t._2, t._1))))
-    assert(right2LeftEdges.forall(t => !left2RightEdges.contains((t._2, t._1))))
+    // assert(edgeDirection.forall(t => !edgeDirection.contains((t._2, t._1))))
+    // assert(left2RightEdges.forall(t => !right2LeftEdges.contains((t._2, t._1))))
+    // assert(right2LeftEdges.forall(t => !left2RightEdges.contains((t._2, t._1))))
+    end = System.currentTimeMillis()
+    logWarning(s"Computing optimal graph time: ${(end - start) / 1000}s")
 
-    //
+    // get balancing partitions
     val leftBalancingPartitions = balancingPartitions
       .filterKeys(partitionId => partitionId < leftNumPartitions)
     val rightBalancingPartitions = balancingPartitions
       .filterKeys(partitionId => partitionId >= leftNumPartitions)
       .map(x => (x._1 - leftNumPartitions, x._2))
 
+    // run join
     val right2LeftAnswerRDD = getJoinedRDD(leftTrieRDD, rightTrieRDD,
       leftBalancingPartitions, left2RightEdges, right2LeftEdges, distanceFunction, threshold)
     val left2RightAnswerRDD = getJoinedRDD(rightTrieRDD, leftTrieRDD,
