@@ -44,14 +44,19 @@ case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expressio
   override def output: Seq[Attribute] = left.output ++ right.output
 
   val LAMBDA: Double = 1000.0
-  val MIN_OPTIMIZATION_COUNT: Long = 10000
+  val MIN_OPTIMIZATION_COUNT: Long = 1000
 
   protected override def doExecute(): RDD[InternalRow] = {
+    logWarning(s"Distance function: $function")
+    val threshold = thresholdLiteral.value.asInstanceOf[Number].doubleValue()
+    logWarning(s"Threshold: $threshold")
+
     val leftResults = left.execute()
     val rightResults = right.execute()
     val leftCount = leftResults.count()
     val rightCount = rightResults.count()
     logWarning(s"Data count: $leftCount, $rightCount")
+
     if (leftCount > MIN_OPTIMIZATION_COUNT && rightCount > MIN_OPTIMIZATION_COUNT) {
       logWarning("Applying efficient trajectory similarity join algorithm!")
       val leftRDD = leftResults.map(row =>
@@ -62,11 +67,7 @@ case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expressio
         new DITAIternalRow(row, TrajectorySimilarityExpression.getPoints(
           BindReferences.bindReference(rightKey, right.output)
             .eval(row).asInstanceOf[UnsafeArrayData]))).asInstanceOf[RDD[Trajectory]]
-      val distanceFunction = function match {
-        case TrajectorySimilarityFunction.DTW => TrajectorySimilarity.DTWDistance
-      }
-      val threshold = thresholdLiteral.value.asInstanceOf[Number].doubleValue()
-      logWarning(s"Threshold $threshold")
+      val distanceFunction = TrajectorySimilarity.getDistanceFunction(function)
 
       // TODO: get index if it exists
       val leftTrieRDD = new TrieRDD(leftRDD)
@@ -81,7 +82,6 @@ case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expressio
           new JoinedRow(x._1.asInstanceOf[DITAIternalRow].row,
             x._2.asInstanceOf[DITAIternalRow].row))
       }
-      val end = System.currentTimeMillis()
       outputRDD.asInstanceOf[RDD[InternalRow]]
     } else {
       val spillThreshold = sqlContext.conf.cartesianProductExecBufferSpillThreshold

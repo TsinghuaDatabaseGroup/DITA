@@ -16,6 +16,8 @@
 
 package org.apache.spark.sql.catalyst.expressions.dita.common.trajectory
 
+import org.apache.spark.sql.catalyst.expressions.dita.TrajectorySimilarityFunction
+
 import scala.reflect.ClassTag
 import org.apache.spark.sql.catalyst.expressions.dita.common.DITAConfigConstants
 import org.apache.spark.sql.catalyst.expressions.dita.common.shape.{Point, Rectangle, Shape}
@@ -42,6 +44,14 @@ trait TrajectorySimilarity extends Serializable {
 }
 
 object TrajectorySimilarity {
+
+  def getDistanceFunction(function: TrajectorySimilarityFunction):
+  TrajectorySimilarity = function match {
+    case TrajectorySimilarityFunction.DTW => TrajectorySimilarity.DTWDistance
+    case TrajectorySimilarityFunction.FRECHET => TrajectorySimilarity.FrechetDistance
+    case TrajectorySimilarityFunction.LCSS => TrajectorySimilarity.LCSSDistance
+    case TrajectorySimilarityFunction.EDR => TrajectorySimilarity.EDRDistance
+  }
 
   object DTWDistance extends TrajectorySimilarity {
     private final val MAX_COST = Array.fill[Double](1, 1)(DITAConfigConstants.THRESHOLD_LIMIT)
@@ -272,8 +282,13 @@ object TrajectorySimilarity {
     }
 
     override def evalWithTrajectory(t1: Trajectory, t2: Trajectory, threshold: Double): Double = {
-      val costVector = getDistanceVector(t1.points, t2.points, threshold)
-      costVector.last.last
+      val lengthDiff = math.abs(t1.points.length - t2.points.length)
+      if (lengthDiff > threshold) {
+        lengthDiff.toDouble
+      } else {
+        val costVector = getDistanceVector(t1.points, t2.points, threshold)
+        costVector.last.last
+      }
     }
 
     def subCost(shape1: Shape, shape2: Shape): Double = {
@@ -345,8 +360,13 @@ object TrajectorySimilarity {
     }
 
     override def evalWithTrajectory(t1: Trajectory, t2: Trajectory, threshold: Double): Double = {
-      val costVector = getDistanceVector(t1.points, t2.points, threshold)
-      costVector.last.last
+      val lengthDiff = math.abs(t1.points.length - t2.points.length)
+      if (lengthDiff > threshold) {
+        lengthDiff.toDouble
+      } else {
+        val costVector = getDistanceVector(t1.points, t2.points, threshold)
+        costVector.last.last
+      }
     }
 
     def subCost(shape1: Shape, index1: Int, shape2: Shape, index2: Int): Double = {

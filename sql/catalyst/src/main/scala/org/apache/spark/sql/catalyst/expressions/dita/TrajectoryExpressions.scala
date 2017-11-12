@@ -65,9 +65,24 @@ object TrajectorySimilarityFunction {
     override def sql: String = "DTW"
   }
 
+  case object FRECHET extends TrajectorySimilarityFunction {
+    override def sql: String = "FRECHET"
+  }
+
+  case object LCSS extends TrajectorySimilarityFunction {
+    override def sql: String = "LCSS"
+  }
+
+  case object EDR extends TrajectorySimilarityFunction {
+    override def sql: String = "EDR"
+  }
+
   def apply(typ: String): TrajectorySimilarityFunction =
     typ.toLowerCase(Locale.ROOT).replace("_", "") match {
       case "dtw" => DTW
+      case "frechet" => FRECHET
+      case "lcss" => LCSS
+      case "edr" => EDR
       case _ =>
         val supported = Seq("dtw")
         throw new IllegalArgumentException(s"Unsupported trajectory similarity function '$typ'. " +

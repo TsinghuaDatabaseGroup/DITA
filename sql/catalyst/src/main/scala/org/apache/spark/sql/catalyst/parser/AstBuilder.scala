@@ -1103,6 +1103,12 @@ class AstBuilder(conf: SQLConf) extends SqlBaseBaseVisitor[AnyRef] with Logging 
     ctx.function match {
       case function if function.DTW != null => TrajectorySimilarityExpression(
         TrajectorySimilarityFunction.DTW, expression(ctx.left), expression(ctx.right))
+      case function if function.FRECHET() != null => TrajectorySimilarityExpression(
+        TrajectorySimilarityFunction.FRECHET, expression(ctx.left), expression(ctx.right))
+      case function if function.LCSS() != null => TrajectorySimilarityExpression(
+        TrajectorySimilarityFunction.LCSS, expression(ctx.left), expression(ctx.right))
+      case function if function.EDR() != null => TrajectorySimilarityExpression(
+        TrajectorySimilarityFunction.FRECHET, expression(ctx.left), expression(ctx.right))
     }
   }
 
