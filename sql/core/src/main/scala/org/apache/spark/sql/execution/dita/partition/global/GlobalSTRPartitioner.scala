@@ -28,6 +28,7 @@ case class GlobalSTRPartitioner(expectedNumPartitions: Int,
                                 sampleRate: Double,
                                 minSampleSize: Long,
                                 maxSampleSize: Long,
+                                @transient
                                 dataRDD: RDD[_ <: Product2[Point, Any]])
   extends STRPartitioner(expectedNumPartitions, dimension, maxEntriesPerNode) {
 

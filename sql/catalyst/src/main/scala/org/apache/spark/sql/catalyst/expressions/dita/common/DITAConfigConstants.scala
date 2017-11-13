@@ -49,6 +49,7 @@ object DITAConfigConstants {
   // load balancing
   var BALANCING_PERCENTILE = 0.95
   var BALANCING_SAMPLE_RATE = 0.01
+  val BALANCING_MIN_SAMPLE_SIZE = 1000
 
   // knn
   var KNN_COEFFICIENT = 3

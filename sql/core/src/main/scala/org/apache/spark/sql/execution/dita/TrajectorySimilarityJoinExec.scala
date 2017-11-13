@@ -18,7 +18,6 @@ package org.apache.spark.sql.execution.dita
 
 import scala.collection.mutable.{HashMap, HashSet}
 import scala.util.control.Breaks
-
 import org.apache.spark.Accumulable
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.{PartitionPruningRDD, RDD}
@@ -33,7 +32,7 @@ import org.apache.spark.sql.execution.{BinaryExecNode, SparkPlan}
 import org.apache.spark.sql.execution.dita.index.global.GlobalTrieIndex
 import org.apache.spark.sql.execution.dita.index.local.LocalTrieIndex
 import org.apache.spark.sql.execution.dita.partition.PackedPartition
-import org.apache.spark.sql.execution.dita.partition.global.ExactKeyPartitioner
+import org.apache.spark.sql.execution.dita.partition.global.{ExactKeyPartitioner, GlobalTriePartitioner}
 import org.apache.spark.sql.execution.dita.rdd.TrieRDD
 import org.apache.spark.sql.execution.dita.util.{DITAIternalRow, HashMapParam}
 import org.apache.spark.sql.execution.joins.UnsafeCartesianRDD
@@ -45,7 +44,7 @@ case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expressio
                                         left: SparkPlan, right: SparkPlan) extends BinaryExecNode with Logging {
   override def output: Seq[Attribute] = left.output ++ right.output
 
-  val LAMBDA: Double = 1000.0
+  val LAMBDA: Double = 2.0
   val MIN_OPTIMIZATION_COUNT: Long = 1000
 
   sparkContext.conf.registerKryoClasses(Array(classOf[Shape], classOf[Point],
@@ -286,6 +285,7 @@ case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expressio
     val totalCost = (0 until totalNumPartitions).map(partitionId1 =>
       getTotalCostForPartition(partitionId1, allEdges, edgeDirection)
     ).toArray
+    logWarning(s"Initial maximum total cost: ${totalCost.max}")
 
     // greedy algorithm for chaning edge direction
     val loop = new Breaks
@@ -321,10 +321,13 @@ case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expressio
         if (totalCost.max >= lastMaxCost) {
           edgeDirection -= Tuple2(edge._2, edge._1)
           edgeDirection += edge
+          totalCost(edge._1) = getTotalCostForPartition(edge._1, allEdges, edgeDirection)
+          totalCost(edge._2) = getTotalCostForPartition(edge._2, allEdges, edgeDirection)
           break
         }
       }
     }
+    logWarning(s"Maximum total cost: ${totalCost.max}")
 
     // balancing
     val sortedTotalCost = totalCost.sorted
@@ -350,7 +353,7 @@ case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expressio
   }
 
   def getTotalCost(transWeight: Int, compWeight: Int): Int = {
-    (transWeight / LAMBDA + compWeight).toInt
+    (transWeight * LAMBDA + compWeight).toInt
   }
 
   def getTotalCostForPartition(partitionId1: Int, allEdges: Map[Int, Map[Int, (Int, Int)]],

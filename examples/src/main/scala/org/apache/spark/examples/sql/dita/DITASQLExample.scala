@@ -50,7 +50,7 @@ object DITASQLExample {
     df.createOrReplaceTempView("traj2")
 
     val start = System.currentTimeMillis()
-    spark.sql("SELECT COUNT(*) FROM traj1 JOIN traj2 ON EDR(traj1.traj, traj2.traj) <= 1")
+    spark.sql("SELECT COUNT(*) FROM traj1 JOIN traj2 ON DTW(traj1.traj, traj2.traj) <= 0.005")
       .show()
     val end = System.currentTimeMillis()
 
