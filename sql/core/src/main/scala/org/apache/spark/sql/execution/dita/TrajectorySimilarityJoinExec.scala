@@ -17,6 +17,8 @@
 package org.apache.spark.sql.execution.dita
 
 import scala.collection.mutable.{HashMap, HashSet}
+import scala.util.control.Breaks
+
 import org.apache.spark.Accumulable
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.{PartitionPruningRDD, RDD}
@@ -259,13 +261,9 @@ case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expressio
 
   private def balanceGraph(allEdges: Map[Int, Map[Int, (Int, Int)]],
                            totalNumPartitions: Int): (Set[(Int, Int)], Map[Int, Int]) = {
-    def getWeight(allEdges: Map[Int, Map[Int, (Int, Int)]],
-                  partitionId1: Int, partitionId2: Int): (Int, Int) = {
-      allEdges.getOrElse(partitionId1, Map.empty).getOrElse(partitionId2, (0, 0))
-    }
 
     // initialize edge direction
-    val edgeDirection = (0 until totalNumPartitions).flatMap(partitionId1 => {
+    var edgeDirection = (0 until totalNumPartitions).flatMap(partitionId1 => {
       val edges = allEdges.getOrElse(partitionId1, Map.empty)
       edges.map(y => {
         val partitionId2 = y._1
@@ -284,45 +282,91 @@ case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expressio
       })
     }).toSet
 
-    // TODO: use more complex strategy to optimize edge direction
-
     // get total cost for each partition
-    val totalCost = (0 until totalNumPartitions).map(partitionId1 => {
-      val edges = allEdges.getOrElse(partitionId1, Map.empty)
-      var totalCostForPartition = 0
-      edges.foreach(y => {
-        val partitionId2 = y._1
-        val (transWeight12, _) = y._2
-        val (_, compWeight21) = getWeight(allEdges, partitionId2, partitionId1)
+    val totalCost = (0 until totalNumPartitions).map(partitionId1 =>
+      getTotalCostForPartition(partitionId1, allEdges, edgeDirection)
+    ).toArray
 
-        if (edgeDirection.contains((partitionId1, partitionId2))) {
-          totalCostForPartition += getTotalCost(transWeight12, 0)
-        } else {
-          totalCostForPartition += getTotalCost(0, compWeight21)
+    // greedy algorithm for chaning edge direction
+    val loop = new Breaks
+    import loop.{break, breakable}
+    breakable {
+      while (true) {
+        val partitionId = totalCost.indices.maxBy(totalCost)
+
+        // find edge with biggest gain
+        val edges = edgeDirection.filter(x => x._1 == partitionId || x._2 == partitionId)
+        val edgeCosts = edges.map(x => {
+          val (transWeight12, compWeight12) = getWeight(allEdges, x._1, x._2)
+          val (transWeight21, compWeight21) = getWeight(allEdges, x._2, x._1)
+          if (x._1 == partitionId) {
+            (x, getTotalCost(0, compWeight21) - getTotalCost(transWeight12, 0))
+          } else {
+            (x, getTotalCost(transWeight21, 0) - getTotalCost(0, compWeight12))
+          }
+        })
+        val (edge, gain) = edgeCosts.maxBy(_._2)
+        if (gain <= 0) {
+          break
         }
-      })
-      (partitionId1, totalCostForPartition)
-    }).sortBy(_._2)
+
+        // change edge direction
+        edgeDirection -= edge
+        edgeDirection += Tuple2(edge._2, edge._1)
+
+        // update totalCost
+        val lastMaxCost = totalCost.max
+        totalCost(edge._1) = getTotalCostForPartition(edge._1, allEdges, edgeDirection)
+        totalCost(edge._2) = getTotalCostForPartition(edge._2, allEdges, edgeDirection)
+        if (totalCost.max >= lastMaxCost) {
+          edgeDirection -= Tuple2(edge._2, edge._1)
+          edgeDirection += edge
+          break
+        }
+      }
+    }
 
     // balancing
-    var standardValueForBalancing =
-      totalCost((totalNumPartitions * DITAConfigConstants.BALANCING_PERCENTILE).toInt)._2
+    val sortedTotalCost = totalCost.sorted
+    var standardValueForBalancing: Int =
+      sortedTotalCost((totalNumPartitions * DITAConfigConstants.BALANCING_PERCENTILE).toInt)
     if (standardValueForBalancing == 0) {
       standardValueForBalancing = Int.MaxValue
     }
-    val balancingPartitions = totalCost.filter(_._2 >= standardValueForBalancing)
+    val balancingPartitions = totalCost.zipWithIndex.filter(_._1 >= standardValueForBalancing)
       .map(x => {
-        val partitionId = x._1
-        val totalCostForPartition = x._2
-        val balancingCount = (totalCostForPartition / standardValueForBalancing * 2).toInt + 1
+        val partitionId = x._2
+        val totalCostForPartition = x._1
+        val balancingCount = totalCostForPartition / standardValueForBalancing * 2 + 1
         (partitionId, balancingCount)
       }).toMap
 
     (edgeDirection, balancingPartitions)
   }
 
+  def getWeight(allEdges: Map[Int, Map[Int, (Int, Int)]],
+                partitionId1: Int, partitionId2: Int): (Int, Int) = {
+    allEdges.getOrElse(partitionId1, Map.empty).getOrElse(partitionId2, (0, 0))
+  }
+
   def getTotalCost(transWeight: Int, compWeight: Int): Int = {
     (transWeight / LAMBDA + compWeight).toInt
+  }
+
+  def getTotalCostForPartition(partitionId1: Int, allEdges: Map[Int, Map[Int, (Int, Int)]],
+                               edgeDirection: Set[(Int, Int)]): Int = {
+    val edges = allEdges.getOrElse(partitionId1, Map.empty)
+    edges.map(y => {
+      val partitionId2 = y._1
+      val (transWeight12, _) = y._2
+      val (_, compWeight21) = getWeight(allEdges, partitionId2, partitionId1)
+
+      if (edgeDirection.contains((partitionId1, partitionId2))) {
+        getTotalCost(transWeight12, 0)
+      } else {
+        getTotalCost(0, compWeight21)
+      }
+    }).sum
   }
 
   private def getJoinedRDD(leftTrieRDD: TrieRDD, rightTrieRDD: TrieRDD,
