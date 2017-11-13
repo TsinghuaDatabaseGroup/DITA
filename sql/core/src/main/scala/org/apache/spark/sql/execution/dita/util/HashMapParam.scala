@@ -21,7 +21,7 @@ import org.apache.spark.{AccumulableParam, SparkConf}
 
 import scala.collection.mutable.{HashMap => MutableHashMap}
 
-// TODO: Add Reference
+// Reference: https://gist.github.com/fedragon/b22e5d1eee4803c86e53
 
 /*
  * Allows a mutable HashMap[String, Int] to be used as an accumulator in Spark.
