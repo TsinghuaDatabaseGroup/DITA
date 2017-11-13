@@ -17,7 +17,6 @@
 package org.apache.spark.sql.execution.dita
 
 import scala.collection.mutable.{HashMap, HashSet}
-
 import org.apache.spark.Accumulable
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.{PartitionPruningRDD, RDD}
@@ -26,6 +25,7 @@ import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Exp
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeRowJoiner
 import org.apache.spark.sql.catalyst.expressions.dita.{TrajectorySimilarityExpression, TrajectorySimilarityFunction}
 import org.apache.spark.sql.catalyst.expressions.dita.common.DITAConfigConstants
+import org.apache.spark.sql.catalyst.expressions.dita.common.shape.{Point, Rectangle, Shape}
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.{Trajectory, TrajectorySimilarity}
 import org.apache.spark.sql.execution.{BinaryExecNode, SparkPlan}
 import org.apache.spark.sql.execution.dita.index.global.GlobalTrieIndex
@@ -45,6 +45,9 @@ case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expressio
 
   val LAMBDA: Double = 1000.0
   val MIN_OPTIMIZATION_COUNT: Long = 1000
+
+  sparkContext.conf.registerKryoClasses(Array(classOf[Shape], classOf[Point],
+    classOf[Rectangle], classOf[Trajectory]))
 
   protected override def doExecute(): RDD[InternalRow] = {
     logWarning(s"Distance function: $function")

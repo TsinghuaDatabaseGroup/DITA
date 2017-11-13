@@ -34,6 +34,7 @@ object DITASQLExample {
     val spark = SparkSession
       .builder()
       .master("local[*]")
+      .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
       .getOrCreate()
 
     // For implicit conversions like converting RDDs to DataFrames
