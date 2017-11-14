@@ -17,8 +17,7 @@
 package org.apache.spark.sql.execution.dita.partition.global
 
 import scala.reflect.ClassTag
-
-import org.apache.spark.Partitioner
+import org.apache.spark.{Partition, Partitioner}
 import org.apache.spark.rdd.{RDD, ShuffledRDD}
 
 class ExactKeyPartitioner(expectedNumPartitions: Int) extends Partitioner {
@@ -31,10 +30,24 @@ class ExactKeyPartitioner(expectedNumPartitions: Int) extends Partitioner {
 
 object ExactKeyPartitioner {
   def partition[T: ClassTag](dataRDD: RDD[(Int, T)],
-                            numPartitions: Int): RDD[T] = {
+                             numPartitions: Int): RDD[T] = {
     val partitioner = new ExactKeyPartitioner(numPartitions)
     val shuffled = new ShuffledRDD[Int, T, T](dataRDD, partitioner)
     shuffled.map(_._2)
   }
+
+  def partitionWithToZipRDD[T: ClassTag, V: ClassTag](dataRDD: RDD[(Int, T)],
+                                                      numPartitions: Int,
+                                                      toZipRDD: RDD[V]): RDD[T] = {
+    val partitioner = new ExactKeyPartitioner(numPartitions)
+    val shuffled = new ShuffledRDD[Int, T, T](dataRDD, partitioner) {
+      override protected def getPreferredLocations(partition: Partition): Seq[String] = {
+        toZipRDD.preferredLocations(toZipRDD.partitions(partition.index))
+      }
+    }
+    shuffled.map(_._2)
+  }
 }
+
+
 

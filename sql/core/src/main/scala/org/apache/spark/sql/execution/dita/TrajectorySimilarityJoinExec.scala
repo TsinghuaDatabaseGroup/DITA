@@ -115,8 +115,8 @@ case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expressio
         candidatePartitionIdxs.map(candidatePartitionIdx => (candidatePartitionIdx, t))
       })
     )
-    val partitionedRightCandidatesRDD = ExactKeyPartitioner.partition(rightCandidatesRDD,
-      leftNumPartitions)
+    val partitionedRightCandidatesRDD = ExactKeyPartitioner.partitionWithToZipRDD(
+      rightCandidatesRDD, leftNumPartitions, leftTrieRDD.packedRDD)
     val sampledPartitionedRightCandidatesRDD = partitionedRightCandidatesRDD
       .sample(withReplacement = true, DITAConfigConstants.BALANCING_SAMPLE_RATE)
 
@@ -166,18 +166,6 @@ case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expressio
         balancingPartitionWithIndex
       }
       val bBalancingPartitionsWithIndex = sparkContext.broadcast(balancingPartitionsWithIndex)
-      val balancingRightCandidatesRDD = partitionedRightCandidatesRDD.mapPartitionsWithIndex(
-        (idx, iter) => {
-          if (bBalancingPartitionsWithIndex.value.contains(idx)) {
-            val (balancingPartitionIdx, balancingCount) = bBalancingPartitionsWithIndex.value(idx)
-            iter.map(t => (balancingPartitionIdx +
-              (t.hashCode() % balancingCount + balancingCount) % balancingCount, t))
-          } else {
-            Iterator()
-          }
-        })
-      val balancingPartitionedRightCandidatesRDD = ExactKeyPartitioner.partition(
-        balancingRightCandidatesRDD, balancingPartitionCount)
 
       val balancingLeftDataRDD = balancingPartitionsWithIndex.map
       { case (partitionIdx, (balancingPartitionIdx, balancingCount)) =>
@@ -188,6 +176,20 @@ case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expressio
       }
       val balancingLeftRDD = ExactKeyPartitioner.partition(
         balancingLeftDataRDD.reduce((x, y) => x.union(y)), balancingPartitionCount)
+
+      val balancingRightCandidatesRDD = partitionedRightCandidatesRDD.mapPartitionsWithIndex(
+        (idx, iter) => {
+          if (bBalancingPartitionsWithIndex.value.contains(idx)) {
+            val (balancingPartitionIdx, balancingCount) = bBalancingPartitionsWithIndex.value(idx)
+            iter.map(t => (balancingPartitionIdx +
+              (t.hashCode() % balancingCount + balancingCount) % balancingCount, t))
+          } else {
+            Iterator()
+          }
+        })
+      val balancingPartitionedRightCandidatesRDD = ExactKeyPartitioner.partitionWithToZipRDD(
+        balancingRightCandidatesRDD, balancingPartitionCount, balancingLeftRDD)
+
       val balancingAnswerRDD = balancingLeftRDD
         .zipPartitions(balancingPartitionedRightCandidatesRDD)
         { case (partitionIter, trajectoryIter) =>
@@ -323,8 +325,8 @@ case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expressio
     sampledLeftCandidatesRDD.count()
 
     // get sampled joined data and compute computation cost
-    val partitionedSampledRightCandidatesRDD = ExactKeyPartitioner.partition(
-      sampledRightCandidatesRDD, leftNumPartitions)
+    val partitionedSampledRightCandidatesRDD = ExactKeyPartitioner.partitionWithToZipRDD(
+      sampledRightCandidatesRDD, leftNumPartitions, leftTrieRDD.packedRDD)
     leftTrieRDD.packedRDD.zipPartitions(partitionedSampledRightCandidatesRDD)
     { case (partitionIter, trajectoryIter) =>
         val packedPartition = partitionIter.next()
@@ -338,8 +340,8 @@ case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expressio
         Array(packedPartition.id).iterator
     }.count()
 
-    val partitionedSampledLeftCandidatesRDD = ExactKeyPartitioner.partition(
-      sampledLeftCandidatesRDD, rightNumPartitions)
+    val partitionedSampledLeftCandidatesRDD = ExactKeyPartitioner.partitionWithToZipRDD(
+      sampledLeftCandidatesRDD, rightNumPartitions, rightTrieRDD.packedRDD)
     rightTrieRDD.packedRDD.zipPartitions(partitionedSampledLeftCandidatesRDD)
     { case (partitionIter, trajectoryIter) =>
         val packedPartition = partitionIter.next()
@@ -496,8 +498,8 @@ case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expressio
         sentCandidatePartitionIdxs.map(candidatePartitionIdx => (candidatePartitionIdx, t))
       })
     )
-    val partitionedRightCandidatesRDD = ExactKeyPartitioner.partition(rightCandidatesRDD,
-      leftNumPartitions)
+    val partitionedRightCandidatesRDD = ExactKeyPartitioner.partitionWithToZipRDD(
+      rightCandidatesRDD, leftNumPartitions, leftTrieRDD.packedRDD)
 
     // normal answer
     val normalPartitionedRightCandidatesRDD = partitionedRightCandidatesRDD.mapPartitionsWithIndex((idx, iter) =>
@@ -519,6 +521,17 @@ case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expressio
         balancingPartitionWithIndex
       }
       val bBalancingPartitionsWithIndex = sparkContext.broadcast(balancingPartitionsWithIndex)
+
+      val balancingLeftDataRDD = balancingPartitionsWithIndex.map
+      { case (partitionIdx, (balancingPartitionIdx, balancingCount)) =>
+        new PartitionPruningRDD(leftTrieRDD.packedRDD, _ == partitionIdx)
+          .flatMap(packedPartition => {
+            (0 until balancingCount).map(i => (balancingPartitionIdx + i, packedPartition))
+          })
+      }
+      val balancingLeftRDD = ExactKeyPartitioner.partition(
+        balancingLeftDataRDD.reduce((x, y) => x.union(y)), balancingPartitionCount)
+
       val balancingRightCandidatesRDD = partitionedRightCandidatesRDD.mapPartitionsWithIndex(
         (idx, iter) => {
           if (bBalancingPartitionsWithIndex.value.contains(idx)) {
@@ -529,18 +542,9 @@ case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expressio
             Iterator()
           }
         })
-      val balancingPartitionedRightCandidatesRDD = ExactKeyPartitioner.partition(
-        balancingRightCandidatesRDD, balancingPartitionCount)
+      val balancingPartitionedRightCandidatesRDD = ExactKeyPartitioner.partitionWithToZipRDD(
+        balancingRightCandidatesRDD, balancingPartitionCount, balancingLeftRDD)
 
-      val balancingLeftDataRDD = balancingPartitionsWithIndex.map
-      { case (partitionIdx, (balancingPartitionIdx, balancingCount)) =>
-        new PartitionPruningRDD(leftTrieRDD.packedRDD, _ == partitionIdx)
-          .flatMap(packedPartition => {
-          (0 until balancingCount).map(i => (balancingPartitionIdx + i, packedPartition))
-        })
-      }
-      val balancingLeftRDD = ExactKeyPartitioner.partition(
-        balancingLeftDataRDD.reduce((x, y) => x.union(y)), balancingPartitionCount)
       val balancingAnswerRDD = balancingLeftRDD
         .zipPartitions(balancingPartitionedRightCandidatesRDD)
       { case (partitionIter, trajectoryIter) =>
