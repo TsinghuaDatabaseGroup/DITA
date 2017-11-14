@@ -80,7 +80,8 @@ case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expressio
       logWarning("Building right trie RDD")
 
       // get answer
-      val answerRDD = join(leftTrieRDD, rightTrieRDD, distanceFunction, threshold)
+      // val answerRDD = join(leftTrieRDD, rightTrieRDD, distanceFunction, threshold)
+      val answerRDD = biJoin(leftTrieRDD, rightTrieRDD, distanceFunction, threshold)
       val outputRDD = answerRDD.mapPartitions { iter =>
         iter.map(x =>
           new JoinedRow(x._1.asInstanceOf[DITAIternalRow].row,
@@ -101,6 +102,103 @@ case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expressio
   }
 
   private def join(leftTrieRDD: TrieRDD, rightTrieRDD: TrieRDD,
+                   distanceFunction: TrajectorySimilarity, threshold: Double):
+  RDD[(Trajectory, Trajectory)] = {
+    val leftGlobalTrieIndex = leftTrieRDD.globalIndex.asInstanceOf[GlobalTrieIndex]
+    val bLeftGlobalTrieIndex = sparkContext.broadcast(leftGlobalTrieIndex)
+    val leftNumPartitions = leftTrieRDD.packedRDD.partitions.length
+
+    // get right candidates RDD
+    val rightCandidatesRDD = rightTrieRDD.packedRDD.flatMap(packedPartition =>
+      packedPartition.data.asInstanceOf[Array[Trajectory]].flatMap(t => {
+        val candidatePartitionIdxs = bLeftGlobalTrieIndex.value.getPartitions(t, threshold)
+        candidatePartitionIdxs.map(candidatePartitionIdx => (candidatePartitionIdx, t))
+      })
+    )
+    val partitionedRightCandidatesRDD = ExactKeyPartitioner.partition(rightCandidatesRDD,
+      leftNumPartitions)
+    val sampledPartitionedRightCandidatesRDD = partitionedRightCandidatesRDD
+      .sample(withReplacement = true, DITAConfigConstants.BALANCING_SAMPLE_RATE)
+
+    // get left partition cost
+    val leftPartitionCost = leftTrieRDD.packedRDD.zipPartitions(sampledPartitionedRightCandidatesRDD)
+    { case (partitionIter, trajectoryIter) =>
+      val packedPartition = partitionIter.next()
+      val localTrieIndex = packedPartition.indexes
+        .filter(_.isInstanceOf[LocalTrieIndex]).head.asInstanceOf[LocalTrieIndex]
+      val candidatesCount = trajectoryIter.map(t => localTrieIndex.getCandidates(t, threshold).size)
+        .sum
+      Array((packedPartition.id, candidatesCount)).iterator
+    }.collect()
+
+    // get balancing value
+    val sortedLeftPartitionCost = leftPartitionCost.sortBy(_._2)
+    var standardValueForBalancing: Int = sortedLeftPartitionCost(
+      (leftNumPartitions * DITAConfigConstants.BALANCING_PERCENTILE).toInt)._2
+    if (standardValueForBalancing == 0) {
+      standardValueForBalancing = Int.MaxValue
+    }
+    val balancingPartitions = leftPartitionCost.filter(_._2 >= standardValueForBalancing)
+      .map(x => {
+        val partitionId = x._1
+        val totalCostForPartition = x._2
+        val balancingCount = totalCostForPartition / standardValueForBalancing * 2 + 1
+        (partitionId, balancingCount)
+      }).toMap
+    val bBalancingPartitions = sparkContext.broadcast(balancingPartitions)
+
+    val normalPartitionedRightCandidatesRDD = partitionedRightCandidatesRDD
+      .mapPartitionsWithIndex((idx, iter) =>
+      if (!bBalancingPartitions.value.contains(idx)) iter else Iterator())
+    val normalAnswerRDD = leftTrieRDD.packedRDD.zipPartitions(normalPartitionedRightCandidatesRDD)
+    { case (partitionIter, trajectoryIter) =>
+      localJoin(partitionIter, trajectoryIter, distanceFunction, threshold)
+    }
+
+    if (balancingPartitions.isEmpty) {
+      normalAnswerRDD
+    } else {
+      var balancingPartitionCount = 0
+      val balancingPartitionsWithIndex = balancingPartitions.map
+      { case (partitionIdx, balancingCount) =>
+        val balancingPartitionWithIndex = (partitionIdx, (balancingPartitionCount, balancingCount))
+        balancingPartitionCount += balancingCount
+        balancingPartitionWithIndex
+      }
+      val bBalancingPartitionsWithIndex = sparkContext.broadcast(balancingPartitionsWithIndex)
+      val balancingRightCandidatesRDD = partitionedRightCandidatesRDD.mapPartitionsWithIndex(
+        (idx, iter) => {
+          if (bBalancingPartitionsWithIndex.value.contains(idx)) {
+            val (balancingPartitionIdx, balancingCount) = bBalancingPartitionsWithIndex.value(idx)
+            iter.map(t => (balancingPartitionIdx +
+              (t.hashCode() % balancingCount + balancingCount) % balancingCount, t))
+          } else {
+            Iterator()
+          }
+        })
+      val balancingPartitionedRightCandidatesRDD = ExactKeyPartitioner.partition(
+        balancingRightCandidatesRDD, balancingPartitionCount)
+
+      val balancingLeftDataRDD = balancingPartitionsWithIndex.map
+      { case (partitionIdx, (balancingPartitionIdx, balancingCount)) =>
+        new PartitionPruningRDD(leftTrieRDD.packedRDD, _ == partitionIdx)
+          .flatMap(packedPartition => {
+            (0 until balancingCount).map(i => (balancingPartitionIdx + i, packedPartition))
+          })
+      }
+      val balancingLeftRDD = ExactKeyPartitioner.partition(
+        balancingLeftDataRDD.reduce((x, y) => x.union(y)), balancingPartitionCount)
+      val balancingAnswerRDD = balancingLeftRDD
+        .zipPartitions(balancingPartitionedRightCandidatesRDD)
+        { case (partitionIter, trajectoryIter) =>
+          localJoin(partitionIter, trajectoryIter, distanceFunction, threshold)
+        }
+
+      normalAnswerRDD.union(balancingAnswerRDD)
+    }
+  }
+
+  private def biJoin(leftTrieRDD: TrieRDD, rightTrieRDD: TrieRDD,
                    distanceFunction: TrajectorySimilarity, threshold: Double):
   RDD[(Trajectory, Trajectory)] = {
     // basic variables
@@ -347,16 +445,16 @@ case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expressio
     (edgeDirection, balancingPartitions)
   }
 
-  def getWeight(allEdges: Map[Int, Map[Int, (Int, Int)]],
+  private def getWeight(allEdges: Map[Int, Map[Int, (Int, Int)]],
                 partitionId1: Int, partitionId2: Int): (Int, Int) = {
     allEdges.getOrElse(partitionId1, Map.empty).getOrElse(partitionId2, (0, 0))
   }
 
-  def getTotalCost(transWeight: Int, compWeight: Int): Int = {
+  private def getTotalCost(transWeight: Int, compWeight: Int): Int = {
     (transWeight * LAMBDA + compWeight).toInt
   }
 
-  def getTotalCostForPartition(partitionId1: Int, allEdges: Map[Int, Map[Int, (Int, Int)]],
+  private def getTotalCostForPartition(partitionId1: Int, allEdges: Map[Int, Map[Int, (Int, Int)]],
                                edgeDirection: Set[(Int, Int)]): Int = {
     val edges = allEdges.getOrElse(partitionId1, Map.empty)
     edges.map(y => {
