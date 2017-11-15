@@ -24,16 +24,15 @@ import javax.annotation.concurrent.GuardedBy
 
 import scala.collection.mutable
 import scala.util.{Failure, Success, Try}
-
 import com.google.common.cache.{Cache, CacheBuilder}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.AnalysisException
 import org.apache.spark.sql.catalyst._
 import org.apache.spark.sql.catalyst.analysis._
 import org.apache.spark.sql.catalyst.analysis.FunctionRegistry.FunctionBuilder
+import org.apache.spark.sql.catalyst.expressions.dita.index.{IndexEntry, IndexRegistry, IndexedRelation}
 import org.apache.spark.sql.catalyst.expressions.{Expression, ExpressionInfo}
 import org.apache.spark.sql.catalyst.parser.{CatalystSqlParser, ParserInterface}
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, SubqueryAlias, View}
@@ -56,6 +55,7 @@ class SessionCatalog(
     val externalCatalog: ExternalCatalog,
     globalTempViewManager: GlobalTempViewManager,
     functionRegistry: FunctionRegistry,
+    indexRegistry: IndexRegistry,
     conf: SQLConf,
     hadoopConf: Configuration,
     parser: ParserInterface,
@@ -72,6 +72,7 @@ class SessionCatalog(
       externalCatalog,
       new GlobalTempViewManager("global_temp"),
       functionRegistry,
+      new IndexRegistry,
       conf,
       new Configuration(),
       new CatalystSqlParser(conf),
@@ -1085,6 +1086,25 @@ class SessionCatalog(
    */
   def loadFunctionResources(resources: Seq[FunctionResource]): Unit = {
     resources.foreach(functionResourceLoader.loadResource)
+  }
+
+  /**
+   * create index on the table
+   */
+  def createIndex(tableName: TableIdentifier, indexName: String, plan: LogicalPlan,
+                  indexedRelation: IndexedRelation): Unit = {
+    if (indexRegistry.lookupIndex(indexName, plan).nonEmpty) {
+      logWarning("Index exists!")
+    } else {
+      indexRegistry.registerIndex(indexName, plan, indexedRelation)
+    }
+  }
+
+  /**
+   * lookup index
+   */
+  def lookupIndex(tableName: TableIdentifier, indexName: String, plan: LogicalPlan): Option[IndexEntry] = {
+    indexRegistry.lookupIndex(indexName, plan)
   }
 
   /**

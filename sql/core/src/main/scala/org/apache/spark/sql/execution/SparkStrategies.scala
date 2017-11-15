@@ -30,7 +30,7 @@ import org.apache.spark.sql.catalyst.plans.physical._
 import org.apache.spark.sql.execution
 import org.apache.spark.sql.execution.columnar.{InMemoryRelation, InMemoryTableScanExec}
 import org.apache.spark.sql.execution.command._
-import org.apache.spark.sql.execution.dita.{ExtractTrajectorySimilarityJoin, TrajectorySimilarityJoinExec}
+import org.apache.spark.sql.execution.dita.sql.{ExtractTrajectorySimilarityJoin, TrajectorySimilarityJoinExec}
 import org.apache.spark.sql.execution.exchange.ShuffleExchange
 import org.apache.spark.sql.execution.joins.{BuildLeft, BuildRight}
 import org.apache.spark.sql.execution.streaming._

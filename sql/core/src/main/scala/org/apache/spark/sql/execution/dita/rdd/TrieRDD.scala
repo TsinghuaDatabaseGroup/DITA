@@ -17,15 +17,13 @@
 package org.apache.spark.sql.execution.dita.rdd
 
 import scala.collection.mutable.ArrayBuffer
-
 import org.slf4j.{Logger, LoggerFactory}
-
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.catalyst.expressions.dita.PackedPartition
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.Trajectory
-import org.apache.spark.sql.execution.dita.index.{GlobalIndex, LocalIndex}
+import org.apache.spark.sql.catalyst.expressions.dita.index.{GlobalIndex, LocalIndex}
 import org.apache.spark.sql.execution.dita.index.global.GlobalTrieIndex
 import org.apache.spark.sql.execution.dita.index.local.LocalTrieIndex
-import org.apache.spark.sql.execution.dita.partition.PackedPartition
 import org.apache.spark.sql.execution.dita.partition.global.GlobalTriePartitioner
 import org.apache.spark.storage.StorageLevel
 

@@ -161,6 +161,8 @@ statement
     | SET ROLE .*?                                                     #failNativeCommand
     | SET .*?                                                          #setConfiguration
     | RESET                                                            #resetConfiguration
+    | CREATE TRIE INDEX indexIdentifier=identifier ON
+        tableIdentifier '(' column=identifier ')'                      #createTrieIndex
     | unsupportedHiveNativeCommands .*?                                #failNativeCommand
     ;
 
@@ -972,6 +974,9 @@ DTW: 'DTW';
 FRECHET: 'FRECHET';
 EDR: 'EDR';
 LCSS: 'LCSS';
+
+// Trie Index
+TRIE: 'TRIE';
 
 STRING
     : '\'' ( ~('\''|'\\') | ('\\' .) )* '\''

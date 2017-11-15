@@ -17,7 +17,7 @@
 package org.apache.spark.sql.execution.dita.index.local
 
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.Trajectory
-import org.apache.spark.sql.execution.dita.index.LocalIndex
+import org.apache.spark.sql.catalyst.expressions.dita.index.LocalIndex
 import org.apache.spark.sql.execution.dita.partition.local.LocalTriePartitioner
 
 case class LocalTrieIndex(partitioner: LocalTriePartitioner) extends LocalIndex {

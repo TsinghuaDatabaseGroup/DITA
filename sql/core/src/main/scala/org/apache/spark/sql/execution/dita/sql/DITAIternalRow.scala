@@ -14,7 +14,7 @@
  *  limitations under the License.
  */
 
-package org.apache.spark.sql.execution.dita.util
+package org.apache.spark.sql.execution.dita.sql
 
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.dita.common.shape.Point

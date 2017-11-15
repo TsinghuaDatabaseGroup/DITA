@@ -14,18 +14,8 @@
  *  limitations under the License.
  */
 
-package org.apache.spark.sql.execution.dita.partition
+package org.apache.spark.sql.catalyst.expressions.dita.index
 
-import org.apache.spark.sql.catalyst.expressions.dita.common.DITAConfigConstants
+trait LocalIndex
 
-import scala.util.Random
-import org.apache.spark.sql.execution.dita.index.LocalIndex
-
-case class PackedPartition(id: Int, data: Array[_ <: Any], indexes: Array[LocalIndex]) {
-
-  def getSample(sampleRate: Double): List[_ <: Any] = {
-    val sampleSize = math.max((data.length * sampleRate).toInt,
-      DITAConfigConstants.BALANCING_MIN_SAMPLE_SIZE)
-    Random.shuffle(data.toList).take(sampleSize)
-  }
-}
+trait GlobalIndex

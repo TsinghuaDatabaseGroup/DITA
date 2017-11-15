@@ -14,13 +14,13 @@
  *  limitations under the License.
  */
 
-package org.apache.spark.sql.execution.dita
+package org.apache.spark.sql.execution.dita.sql
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.catalyst.expressions.{Expression, LessThanOrEqual, Literal, PredicateHelper}
 import org.apache.spark.sql.catalyst.expressions.dita.{TrajectorySimilarityExpression, TrajectorySimilarityFunction}
-import org.apache.spark.sql.catalyst.plans.{logical, JoinType}
+import org.apache.spark.sql.catalyst.expressions.{Expression, LessThanOrEqual, Literal, PredicateHelper}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.catalyst.plans.{JoinType, logical}
 
 /**
   * A pattern that finds joins with trajectory similarity conditions.

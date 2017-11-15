@@ -14,28 +14,28 @@
  *  limitations under the License.
  */
 
-package org.apache.spark.sql.execution.dita
+package org.apache.spark.sql.execution.dita.sql
 
-import scala.collection.mutable.{HashMap, HashSet}
-import scala.util.control.Breaks
 import org.apache.spark.Accumulable
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.{PartitionPruningRDD, RDD}
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Expression, JoinedRow, Literal, UnsafeArrayData, UnsafeRow}
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeRowJoiner
-import org.apache.spark.sql.catalyst.expressions.dita.{TrajectorySimilarityExpression, TrajectorySimilarityFunction}
 import org.apache.spark.sql.catalyst.expressions.dita.common.DITAConfigConstants
 import org.apache.spark.sql.catalyst.expressions.dita.common.shape.{Point, Rectangle, Shape}
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.{Trajectory, TrajectorySimilarity}
-import org.apache.spark.sql.execution.{BinaryExecNode, SparkPlan}
+import org.apache.spark.sql.catalyst.expressions.dita.{PackedPartition, TrajectorySimilarityExpression, TrajectorySimilarityFunction}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Expression, JoinedRow, Literal, UnsafeArrayData, UnsafeRow}
 import org.apache.spark.sql.execution.dita.index.global.GlobalTrieIndex
 import org.apache.spark.sql.execution.dita.index.local.LocalTrieIndex
-import org.apache.spark.sql.execution.dita.partition.PackedPartition
-import org.apache.spark.sql.execution.dita.partition.global.{ExactKeyPartitioner, GlobalTriePartitioner}
+import org.apache.spark.sql.execution.dita.partition.global.ExactKeyPartitioner
 import org.apache.spark.sql.execution.dita.rdd.TrieRDD
-import org.apache.spark.sql.execution.dita.util.{DITAIternalRow, HashMapParam}
+import org.apache.spark.sql.execution.dita.util.HashMapParam
 import org.apache.spark.sql.execution.joins.UnsafeCartesianRDD
+import org.apache.spark.sql.execution.{BinaryExecNode, SparkPlan}
+
+import scala.collection.mutable.{HashMap, HashSet}
+import scala.util.control.Breaks
 
 
 case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expression,
