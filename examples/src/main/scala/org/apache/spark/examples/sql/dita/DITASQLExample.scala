@@ -49,6 +49,9 @@ object DITASQLExample {
     df.createOrReplaceTempView("traj1")
     df.createOrReplaceTempView("traj2")
 
+    // create index
+    spark.sql("CREATE TRIE INDEX traj1_index ON traj1")
+
     val start = System.currentTimeMillis()
     spark.sql("SELECT COUNT(*) FROM traj1 JOIN traj2 ON DTW(traj1.traj, traj2.traj) <= 0.005")
       .show()

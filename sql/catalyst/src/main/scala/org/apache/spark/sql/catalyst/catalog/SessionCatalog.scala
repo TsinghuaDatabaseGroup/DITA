@@ -1088,6 +1088,21 @@ class SessionCatalog(
   }
 
   /**
+   * create index on the table
+   */
+  def createIndex(tableName: TableIdentifier, indexName: String): Unit = {
+    // TODO lookup index
+    // TODO creaete index
+  }
+
+  /**
+   * lookup index
+   */
+  def lookupIndex(tableName: TableIdentifier, indexName: String): Unit = {
+    // TODO lookup index
+  }
+
+  /**
    * Registers a temporary or permanent function into a session-specific [[FunctionRegistry]]
    */
   def registerFunction(
