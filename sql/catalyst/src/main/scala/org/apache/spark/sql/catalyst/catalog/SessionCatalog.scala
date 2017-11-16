@@ -1108,6 +1108,13 @@ class SessionCatalog(
   }
 
   /**
+    * lookup index
+    */
+  def lookupIndex(plan: LogicalPlan): Option[IndexEntry] = {
+    indexRegistry.lookupIndex(plan)
+  }
+
+  /**
    * Registers a temporary or permanent function into a session-specific [[FunctionRegistry]]
    */
   def registerFunction(

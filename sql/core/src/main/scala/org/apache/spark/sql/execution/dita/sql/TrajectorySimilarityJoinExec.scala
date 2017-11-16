@@ -24,8 +24,10 @@ import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeRowJoiner
 import org.apache.spark.sql.catalyst.expressions.dita.common.DITAConfigConstants
 import org.apache.spark.sql.catalyst.expressions.dita.common.shape.{Point, Rectangle, Shape}
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.{Trajectory, TrajectorySimilarity}
+import org.apache.spark.sql.catalyst.expressions.dita.index.IndexedRelation
 import org.apache.spark.sql.catalyst.expressions.dita.{PackedPartition, TrajectorySimilarityExpression, TrajectorySimilarityFunction}
 import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Expression, JoinedRow, Literal, UnsafeArrayData, UnsafeRow}
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.dita.index.global.GlobalTrieIndex
 import org.apache.spark.sql.execution.dita.index.local.LocalTrieIndex
 import org.apache.spark.sql.execution.dita.partition.global.ExactKeyPartitioner
@@ -41,6 +43,7 @@ import scala.util.control.Breaks
 case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expression,
                                         function: TrajectorySimilarityFunction,
                                         thresholdLiteral: Literal,
+                                        leftLogicalPlan: LogicalPlan, rightLogicalPlan: LogicalPlan,
                                         left: SparkPlan, right: SparkPlan) extends BinaryExecNode with Logging {
   override def output: Seq[Attribute] = left.output ++ right.output
 
@@ -63,21 +66,30 @@ case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expressio
 
     if (leftCount > MIN_OPTIMIZATION_COUNT && rightCount > MIN_OPTIMIZATION_COUNT) {
       logWarning("Applying efficient trajectory similarity join algorithm!")
-      val leftRDD = leftResults.map(row =>
-        new DITAIternalRow(row, TrajectorySimilarityExpression.getPoints(
-          BindReferences.bindReference(leftKey, left.output)
-            .eval(row).asInstanceOf[UnsafeArrayData]))).asInstanceOf[RDD[Trajectory]]
-      val rightRDD = right.execute().map(row =>
-        new DITAIternalRow(row, TrajectorySimilarityExpression.getPoints(
-          BindReferences.bindReference(rightKey, right.output)
-            .eval(row).asInstanceOf[UnsafeArrayData]))).asInstanceOf[RDD[Trajectory]]
+
       val distanceFunction = TrajectorySimilarity.getDistanceFunction(function)
 
-      // TODO: get index if it exists
-      val leftTrieRDD = new TrieRDD(leftRDD)
-      logWarning("Building left trie RDD")
-      val rightTrieRDD = new TrieRDD(rightRDD)
-      logWarning("Building right trie RDD")
+      val leftTrieRDD = getIndexedRelation(leftLogicalPlan)
+        .map(_.asInstanceOf[TrieIndexedRelation].trieRDD)
+        .getOrElse({
+          logWarning("Building left trie RDD")
+          val leftRDD = leftResults.map(row =>
+            new DITAIternalRow(row, TrajectorySimilarityExpression.getPoints(
+              BindReferences.bindReference(leftKey, left.output)
+                .eval(row).asInstanceOf[UnsafeArrayData]))).asInstanceOf[RDD[Trajectory]]
+          new TrieRDD(leftRDD)
+        })
+
+      val rightTrieRDD = getIndexedRelation(rightLogicalPlan)
+        .map(_.asInstanceOf[TrieIndexedRelation].trieRDD)
+        .getOrElse({
+          logWarning("Building right trie RDD")
+          val rightRDD = rightResults.map(row =>
+            new DITAIternalRow(row, TrajectorySimilarityExpression.getPoints(
+              BindReferences.bindReference(rightKey, right.output)
+                .eval(row).asInstanceOf[UnsafeArrayData]))).asInstanceOf[RDD[Trajectory]]
+          new TrieRDD(rightRDD)
+        })
 
       // get answer
       // val answerRDD = join(leftTrieRDD, rightTrieRDD, distanceFunction, threshold)
@@ -574,5 +586,9 @@ case class TrajectorySimilarityJoinExec(leftKey: Expression, rightKey: Expressio
     })
 
     answerPairs.iterator
+  }
+
+  private def getIndexedRelation(plan: LogicalPlan): Option[IndexedRelation] = {
+    sqlContext.sessionState.indexRegistry.lookupIndex(plan).map(_.relation)
   }
 }

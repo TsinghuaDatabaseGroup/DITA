@@ -57,7 +57,7 @@ object DITASQLExample {
 
     // create index for traj2
     start = System.currentTimeMillis()
-    spark.sql("CREATE TRIE INDEX traj1_index ON traj2 (traj)")
+    spark.sql("CREATE TRIE INDEX traj2_index ON traj2 (traj)")
     end = System.currentTimeMillis()
     println(s"Building Index time: ${end - start} ms")
 
@@ -67,13 +67,11 @@ object DITASQLExample {
     end = System.currentTimeMillis()
     println(s"Building Index time: ${end - start} ms")
 
-    /*
     start = System.currentTimeMillis()
     spark.sql("SELECT COUNT(*) FROM traj1 JOIN traj2 ON DTW(traj1.traj, traj2.traj) <= 0.005")
       .show()
     end = System.currentTimeMillis()
     println(s"Join Running time: ${end - start} ms")
-    */
 
     spark.stop()
   }
