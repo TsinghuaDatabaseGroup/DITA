@@ -161,7 +161,8 @@ statement
     | SET ROLE .*?                                                     #failNativeCommand
     | SET .*?                                                          #setConfiguration
     | RESET                                                            #resetConfiguration
-    | CREATE TRIE INDEX indexIdentifier=identifier ON tableIdentifier  #createTrieIndex
+    | CREATE TRIE INDEX indexIdentifier=identifier ON
+        tableIdentifier '(' column=identifier ')'                      #createTrieIndex
     | unsupportedHiveNativeCommands .*?                                #failNativeCommand
     ;
 

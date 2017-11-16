@@ -14,18 +14,8 @@
  *  limitations under the License.
  */
 
-package org.apache.spark.sql.execution.dita.ddl
+package org.apache.spark.sql.catalyst.expressions.dita.index
 
-import org.apache.spark.sql.{Row, SparkSession}
-import org.apache.spark.sql.catalyst.TableIdentifier
-import org.apache.spark.sql.execution.command.RunnableCommand
+trait LocalIndex
 
-case class CreateTrieIndexCommand(tableName: TableIdentifier, indexName: String)
-  extends RunnableCommand {
-
-  override def run(sparkSession: SparkSession): Seq[Row] = {
-    val catalog = sparkSession.sessionState.catalog
-    catalog.createIndex(tableName, indexName)
-    Seq.empty[Row]
-  }
-}
+trait GlobalIndex

@@ -14,12 +14,18 @@
  *  limitations under the License.
  */
 
-package org.apache.spark.sql.execution.dita.util
+package org.apache.spark.sql.catalyst.expressions.dita
 
-import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.dita.common.shape.Point
-import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.Trajectory
+import org.apache.spark.sql.catalyst.expressions.dita.common.DITAConfigConstants
+import org.apache.spark.sql.catalyst.expressions.dita.index.LocalIndex
 
-class DITAIternalRow(internalRow: InternalRow, points: Array[Point]) extends Trajectory(points) {
-  var row: InternalRow = internalRow
+import scala.util.Random
+
+case class PackedPartition(id: Int, data: Array[_ <: Any], indexes: Array[LocalIndex]) {
+
+  def getSample(sampleRate: Double): List[_ <: Any] = {
+    val sampleSize = math.max((data.length * sampleRate).toInt,
+      DITAConfigConstants.BALANCING_MIN_SAMPLE_SIZE)
+    Random.shuffle(data.toList).take(sampleSize)
+  }
 }

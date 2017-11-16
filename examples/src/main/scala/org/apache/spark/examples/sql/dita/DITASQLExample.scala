@@ -49,15 +49,31 @@ object DITASQLExample {
     df.createOrReplaceTempView("traj1")
     df.createOrReplaceTempView("traj2")
 
-    // create index
-    spark.sql("CREATE TRIE INDEX traj1_index ON traj1")
+    // create index for traj1
+    var start = System.currentTimeMillis()
+    spark.sql("CREATE TRIE INDEX traj1_index ON traj1 (traj)")
+    var end = System.currentTimeMillis()
+    println(s"Building Index time: ${end - start} ms")
 
-    val start = System.currentTimeMillis()
+    // create index for traj2
+    start = System.currentTimeMillis()
+    spark.sql("CREATE TRIE INDEX traj1_index ON traj2 (traj)")
+    end = System.currentTimeMillis()
+    println(s"Building Index time: ${end - start} ms")
+
+    // create index
+    start = System.currentTimeMillis()
+    spark.sql("CREATE TRIE INDEX traj1_index ON traj1 (traj)")
+    end = System.currentTimeMillis()
+    println(s"Building Index time: ${end - start} ms")
+
+    /*
+    start = System.currentTimeMillis()
     spark.sql("SELECT COUNT(*) FROM traj1 JOIN traj2 ON DTW(traj1.traj, traj2.traj) <= 0.005")
       .show()
-    val end = System.currentTimeMillis()
-
-    println(s"Running time: ${end - start} ms")
+    end = System.currentTimeMillis()
+    println(s"Join Running time: ${end - start} ms")
+    */
 
     spark.stop()
   }

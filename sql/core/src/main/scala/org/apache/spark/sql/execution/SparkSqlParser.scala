@@ -31,7 +31,7 @@ import org.apache.spark.sql.catalyst.parser.SqlBaseParser._
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.command._
 import org.apache.spark.sql.execution.datasources.{CreateTable, _}
-import org.apache.spark.sql.execution.dita.ddl.CreateTrieIndexCommand
+import org.apache.spark.sql.execution.dita.sql.CreateTrieIndexCommand
 import org.apache.spark.sql.internal.{HiveSerDe, SQLConf, VariableSubstitution}
 import org.apache.spark.sql.types.StructType
 
@@ -456,7 +456,7 @@ class SparkSqlAstBuilder(conf: SQLConf) extends AstBuilder(conf) {
    * Create a trie index, returning a [[CreateTrieIndex]] logical plan
    */
   override def visitCreateTrieIndex(ctx: CreateTrieIndexContext): LogicalPlan = withOrigin(ctx) {
-    CreateTrieIndexCommand(visitTableIdentifier(ctx.tableIdentifier()),
+    CreateTrieIndexCommand(visitTableIdentifier(ctx.tableIdentifier()), ctx.column.getText,
       ctx.indexIdentifier.getText)
   }
 

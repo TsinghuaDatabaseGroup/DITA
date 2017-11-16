@@ -14,18 +14,20 @@
  *  limitations under the License.
  */
 
-package org.apache.spark.sql.execution.dita.index.global
+package org.apache.spark.sql.catalyst.expressions.dita.index
 
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.catalyst.analysis.MultiInstanceRelation
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.Trajectory
-import org.apache.spark.sql.catalyst.expressions.dita.index.GlobalIndex
-import org.apache.spark.sql.execution.dita.partition.global.GlobalTriePartitioner
+import org.apache.spark.sql.catalyst.expressions.dita.{PackedPartition, TrajectorySimilarityExpression}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, UnsafeArrayData}
+import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
-case class GlobalTrieIndex(partitioner: GlobalTriePartitioner) extends GlobalIndex {
-  def getPartitions(key: Trajectory, threshold: Double): List[Int] = {
-    partitioner.getPartitions(key, threshold, 0.0).map(_._1)
-  }
+abstract class IndexedRelation extends LogicalPlan {
+  def indexedRDD: RDD[PackedPartition]
+  def globalIndex: GlobalIndex
 
-  def getPartitionsWithDistances(key: Trajectory, threshold: Double): List[(Int, Double)] = {
-    partitioner.getPartitions(key, threshold, 0.0)
-  }
+  override def output: Seq[Attribute] = Nil
+
+  override def children: Seq[LogicalPlan] = Nil
 }
