@@ -31,7 +31,7 @@ import org.apache.spark.sql.catalyst.parser.SqlBaseParser._
 import org.apache.spark.sql.catalyst.plans.logical._
 import org.apache.spark.sql.execution.command._
 import org.apache.spark.sql.execution.datasources.{CreateTable, _}
-import org.apache.spark.sql.execution.dita.sql.CreateTrieIndexCommand
+import org.apache.spark.sql.execution.dita.sql.{CreateTrieIndexCommand, DropTrieIndexCommand, ShowTrieIndexesCommand}
 import org.apache.spark.sql.internal.{HiveSerDe, SQLConf, VariableSubstitution}
 import org.apache.spark.sql.types.StructType
 
@@ -453,11 +453,25 @@ class SparkSqlAstBuilder(conf: SQLConf) extends AstBuilder(conf) {
   }
 
   /*
-   * Create a trie index, returning a [[CreateTrieIndex]] logical plan
+   * Create a trie index, returning a [[CreateTrieIndexCommand]] logical plan
    */
   override def visitCreateTrieIndex(ctx: CreateTrieIndexContext): LogicalPlan = withOrigin(ctx) {
     CreateTrieIndexCommand(visitTableIdentifier(ctx.tableIdentifier), ctx.column.getText,
       ctx.indexIdentifier.getText)
+  }
+
+  /*
+   * Drop a trie index, returning a [[DropTrieIndexCommand]] logical plan
+   */
+  override def visitDropTrieIndex(ctx: DropTrieIndexContext): LogicalPlan = withOrigin(ctx) {
+    DropTrieIndexCommand(visitTableIdentifier(ctx.tableIdentifier), ctx.indexIdentifier.getText)
+  }
+
+  /*
+   * Show all trie indexes, returning a [[ShowTrieIndexes]] logical plan
+   */
+  override def visitShowTrieIndexes(ctx: ShowTrieIndexesContext): LogicalPlan = withOrigin(ctx) {
+    ShowTrieIndexesCommand()
   }
 
   /**

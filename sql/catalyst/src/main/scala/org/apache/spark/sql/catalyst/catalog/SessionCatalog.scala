@@ -1091,19 +1091,20 @@ class SessionCatalog(
   /**
    * create index on the table
    */
-  def createIndex(tableName: TableIdentifier, indexName: String, plan: LogicalPlan,
+  def createIndex(tableName: Option[TableIdentifier], indexName: String, plan: LogicalPlan,
                   indexedRelation: IndexedRelation): Unit = {
     if (indexRegistry.lookupIndex(indexName, plan).nonEmpty) {
       logWarning("Index exists!")
     } else {
-      indexRegistry.registerIndex(indexName, plan, indexedRelation)
+      indexRegistry.registerIndex(indexName, tableName.map(_.table), plan, indexedRelation)
     }
   }
 
   /**
    * lookup index
    */
-  def lookupIndex(tableName: TableIdentifier, indexName: String, plan: LogicalPlan): Option[IndexEntry] = {
+  def lookupIndex(tableName: Option[TableIdentifier], indexName: String,
+                  plan: LogicalPlan): Option[IndexEntry] = {
     indexRegistry.lookupIndex(indexName, plan)
   }
 
@@ -1112,6 +1113,31 @@ class SessionCatalog(
     */
   def lookupIndex(plan: LogicalPlan): Option[IndexEntry] = {
     indexRegistry.lookupIndex(plan)
+  }
+
+  /**
+    * drop index
+    */
+  def dropIndex(plan: LogicalPlan): Unit = {
+    if (!indexRegistry.dropIndex(plan)) {
+      throw new NoSuchIndexException(plan.nodeName)
+    }
+  }
+
+  /**
+    * drop index
+    */
+  def dropIndex(tableName: Option[TableIdentifier], indexName: String): Unit = {
+    if (!indexRegistry.dropIndex(indexName, tableName.map(_.table))) {
+      throw new NoSuchIndexException(indexName)
+    }
+  }
+
+  /**
+    * show indexes
+    */
+  def showIndexes(): Seq[String] = {
+    indexRegistry.showIndexes()
   }
 
   /**
@@ -1305,6 +1331,7 @@ class SessionCatalog(
     clearTempTables()
     globalTempViewManager.clear()
     functionRegistry.clear()
+    indexRegistry.clear()
     tableRelationCache.invalidateAll()
     // restore built-in functions
     FunctionRegistry.builtin.listFunction().foreach { f =>

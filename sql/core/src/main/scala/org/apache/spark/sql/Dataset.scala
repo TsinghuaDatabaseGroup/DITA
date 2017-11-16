@@ -48,7 +48,7 @@ import org.apache.spark.sql.catalyst.util.{DateTimeUtils, usePrettyExpression}
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.command._
 import org.apache.spark.sql.execution.datasources.LogicalRelation
-import org.apache.spark.sql.execution.dita.sql.CreateTrieIndexCommand
+import org.apache.spark.sql.execution.dita.sql.{CreateTrieIndexCommand, DropTrieIndexCommand}
 import org.apache.spark.sql.execution.python.EvaluatePython
 import org.apache.spark.sql.streaming.DataStreamWriter
 import org.apache.spark.sql.types._
@@ -888,14 +888,21 @@ class Dataset[T] private[sql](
   }
 
   /*
-   * Trajectory Similarity Join
+   * Create trie index
    */
   def createTrieIndex(key: Column, indexName: String): Unit = {
     CreateTrieIndexCommand.createTrieIndex(sparkSession, logicalPlan, key.toString, indexName, None)
   }
 
   /*
-   * Trajectory Similarity Join
+   * Drop trie index
+   */
+  def dropTrieIndex(key: Column): Unit = {
+    DropTrieIndexCommand.dropTrieIndex(sparkSession, logicalPlan, key.toString)
+  }
+
+  /*
+   * Trajectory similarity join
    */
   def trajSimJoin(right: Dataset[_], leftKey: Column, rightKey: Column,
                   function: TrajectorySimilarityFunction, threshold: Double): DataFrame = withPlan {

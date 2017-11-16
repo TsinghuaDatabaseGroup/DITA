@@ -163,6 +163,8 @@ statement
     | RESET                                                            #resetConfiguration
     | CREATE TRIE INDEX indexIdentifier=identifier ON
         tableIdentifier '(' column=identifier ')'                      #createTrieIndex
+    | DROP TRIE INDEX indexIdentifier=identifier ON tableIdentifier    #dropTrieIndex
+    | SHOW TRIE INDEXES                                                #showTrieIndexes
     | unsupportedHiveNativeCommands .*?                                #failNativeCommand
     ;
 

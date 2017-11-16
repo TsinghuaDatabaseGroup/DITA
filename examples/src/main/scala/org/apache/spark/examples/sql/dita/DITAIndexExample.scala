@@ -19,7 +19,7 @@ package org.apache.spark.examples.sql.dita
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.expressions.dita.common.DITAConfigConstants
 
-object DITASQLExample {
+object DITAIndexExample {
 
   case class TrajectoryRecord(id: Long, traj: Array[Array[Double]])
 
@@ -46,32 +46,18 @@ object DITASQLExample {
       .filter(_.traj.length <= DITAConfigConstants.TRAJECTORY_MAX_LENGTH)
       .toDF()
     df.createOrReplaceTempView("traj1")
-    df.createOrReplaceTempView("traj2")
 
-    // create index for traj1
-    var start = System.currentTimeMillis()
+    spark.sql("SHOW TRIE INDEXES").show()
     spark.sql("CREATE TRIE INDEX traj1_index ON traj1 (traj)")
-    var end = System.currentTimeMillis()
-    println(s"Building Index time: ${end - start} ms")
+    spark.sql("SHOW TRIE INDEXES").show()
 
-    // create index for traj2
-    start = System.currentTimeMillis()
-    spark.sql("CREATE TRIE INDEX traj2_index ON traj2 (traj)")
-    end = System.currentTimeMillis()
-    println(s"Building Index time: ${end - start} ms")
+    spark.sql("DROP TRIE INDEX traj1_index ON traj1")
+    spark.sql("SHOW TRIE INDEXES").show()
 
-    // create index
-    start = System.currentTimeMillis()
-    spark.sql("CREATE TRIE INDEX traj1_index ON traj1 (traj)")
-    end = System.currentTimeMillis()
-    println(s"Building Index time: ${end - start} ms")
+    df.createTrieIndex(df("traj"), "traj1_index")
+    spark.sql("SHOW TRIE INDEXES").show()
 
-    start = System.currentTimeMillis()
-    spark.sql("SELECT COUNT(*) FROM traj1 JOIN traj2 ON DTW(traj1.traj, traj2.traj) <= 0.005")
-      .show()
-    end = System.currentTimeMillis()
-    println(s"Join Running time: ${end - start} ms")
-
-    spark.stop()
+    df.dropTrieIndex(df("traj"))
+    spark.sql("SHOW TRIE INDEXES").show()
   }
 }

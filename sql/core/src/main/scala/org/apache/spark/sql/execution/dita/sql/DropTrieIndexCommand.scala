@@ -16,26 +16,30 @@
 
 package org.apache.spark.sql.execution.dita.sql
 
-import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{AnalysisException, Row, SparkSession}
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project}
 import org.apache.spark.sql.execution.command.RunnableCommand
 
-case class CreateTrieIndexCommand(tableName: TableIdentifier, column: String, indexName: String)
+case class DropTrieIndexCommand(tableName: TableIdentifier, indexName: String)
   extends RunnableCommand {
 
   override def run(sparkSession: SparkSession): Seq[Row] = {
-    val table = sparkSession.table(tableName)
-    CreateTrieIndexCommand.createTrieIndex(sparkSession, table.logicalPlan, column, indexName,
-      Some(tableName))
+    DropTrieIndexCommand.dropTrieIndex(sparkSession, indexName, Some(tableName))
     Seq.empty[Row]
   }
 }
 
-object CreateTrieIndexCommand extends Logging {
-  def createTrieIndex(sparkSession: SparkSession, logicalPlan: LogicalPlan, column: String,
-                      indexName: String, tableName: Option[TableIdentifier]): Unit = {
+object DropTrieIndexCommand {
+
+  def dropTrieIndex(sparkSession: SparkSession, indexName: String,
+                    tableName: Option[TableIdentifier]): Unit = {
+    val catalog = sparkSession.sessionState.catalog
+    catalog.dropIndex(tableName, indexName)
+  }
+
+  def dropTrieIndex(sparkSession: SparkSession, logicalPlan: LogicalPlan,
+                    column: String): Unit = {
     val catalog = sparkSession.sessionState.catalog
     val attribute = {
       val resolver = sparkSession.sessionState.conf.resolver
@@ -44,13 +48,6 @@ object CreateTrieIndexCommand extends Logging {
     }
     val project = sparkSession.sessionState.optimizer.execute(
       Project(Seq(attribute), logicalPlan.children.head))
-
-    if (catalog.lookupIndex(tableName, indexName, project).isEmpty) {
-      val child = sparkSession.sessionState.executePlan(logicalPlan).sparkPlan
-      val indexedRelation = TrieIndexedRelation(child, attribute)()
-      catalog.createIndex(tableName, indexName, project, indexedRelation)
-    } else {
-      logWarning(s"Index $indexName on Table ${tableName.getOrElse("EMPTY")} exists!")
-    }
+    catalog.dropIndex(project)
   }
 }

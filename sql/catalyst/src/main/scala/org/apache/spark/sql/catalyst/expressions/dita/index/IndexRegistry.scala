@@ -20,22 +20,48 @@ import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
 import scala.collection.mutable.ArrayBuffer
 
-case class IndexEntry(name: String, plan: LogicalPlan, relation: IndexedRelation)
+case class IndexEntry(indexName: String, tableName: Option[String], plan: LogicalPlan,
+                      relation: IndexedRelation)
 
 class IndexRegistry {
   protected val indexEntries = new ArrayBuffer[IndexEntry]
 
-  def registerIndex(name: String, plan: LogicalPlan, relation: IndexedRelation):
-  Unit = synchronized {
-    indexEntries.append(IndexEntry(name, plan, relation))
+  def registerIndex(indexName: String, tableName: Option[String], plan: LogicalPlan,
+                    relation: IndexedRelation): Unit = synchronized {
+    indexEntries.append(IndexEntry(indexName, tableName, plan, relation))
   }
 
   def lookupIndex(plan: LogicalPlan): Option[IndexEntry] = synchronized {
     indexEntries.find(entry => entry.plan.sameResult(plan))
   }
 
-  def lookupIndex(name: String, plan: LogicalPlan): Option[IndexEntry] = synchronized {
-    indexEntries.find(entry => entry.name.equals(name) && entry.plan.sameResult(plan))
+  def lookupIndex(indexName: String, plan: LogicalPlan): Option[IndexEntry] = synchronized {
+    indexEntries.find(entry => entry.indexName.equals(indexName) && entry.plan.sameResult(plan))
+  }
+
+  def dropIndex(plan: LogicalPlan): Boolean = synchronized {
+    val index = indexEntries.zipWithIndex.find(entry => entry._1.plan.sameResult(plan)).map(_._2)
+    if (index.isDefined) {
+      indexEntries.remove(index.get)
+      true
+    } else {
+      false
+    }
+  }
+
+  def dropIndex(indexName: String, tableName: Option[String]): Boolean = synchronized {
+    val index = indexEntries.zipWithIndex.find(entry => entry._1.indexName.equals(indexName)
+      && entry._1.tableName.equals(tableName)).map(_._2)
+    if (index.isDefined) {
+      indexEntries.remove(index.get)
+      true
+    } else {
+      false
+    }
+  }
+
+  def showIndexes(): Seq[String] = synchronized {
+    indexEntries.map(entry => s"(${entry.tableName}, ${entry.indexName})")
   }
 
   def clear(): Unit = synchronized {
@@ -45,7 +71,7 @@ class IndexRegistry {
   override def clone(): IndexRegistry = synchronized {
     val registry = new IndexRegistry
     indexEntries.iterator.foreach(entry =>
-      registry.registerIndex(entry.name, entry.plan, entry.relation))
+      registry.registerIndex(entry.indexName, entry.tableName, entry.plan, entry.relation))
     registry
   }
 }

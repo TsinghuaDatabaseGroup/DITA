@@ -30,7 +30,6 @@ object DITADataFrameExample {
   }
 
   def main(args: Array[String]) {
-    // $example on:init_session$
     val spark = SparkSession
       .builder()
       .master("local[*]")
