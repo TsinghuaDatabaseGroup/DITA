@@ -456,7 +456,7 @@ class SparkSqlAstBuilder(conf: SQLConf) extends AstBuilder(conf) {
    * Create a trie index, returning a [[CreateTrieIndex]] logical plan
    */
   override def visitCreateTrieIndex(ctx: CreateTrieIndexContext): LogicalPlan = withOrigin(ctx) {
-    CreateTrieIndexCommand(visitTableIdentifier(ctx.tableIdentifier()), ctx.column.getText,
+    CreateTrieIndexCommand(visitTableIdentifier(ctx.tableIdentifier), ctx.column.getText,
       ctx.indexIdentifier.getText)
   }
 

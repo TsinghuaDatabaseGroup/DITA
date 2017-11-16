@@ -17,10 +17,8 @@
 package org.apache.spark.sql.catalyst.expressions.dita.index
 
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.catalyst.analysis.MultiInstanceRelation
-import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.Trajectory
-import org.apache.spark.sql.catalyst.expressions.dita.{PackedPartition, TrajectorySimilarityExpression}
-import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, UnsafeArrayData}
+import org.apache.spark.sql.catalyst.expressions.dita.PackedPartition
+import org.apache.spark.sql.catalyst.expressions.Attribute
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
 abstract class IndexedRelation extends LogicalPlan {

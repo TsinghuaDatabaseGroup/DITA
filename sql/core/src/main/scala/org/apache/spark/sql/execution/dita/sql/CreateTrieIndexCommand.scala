@@ -16,27 +16,41 @@
 
 package org.apache.spark.sql.execution.dita.sql
 
+import org.apache.spark.internal.Logging
 import org.apache.spark.sql.{AnalysisException, Row, SparkSession}
 import org.apache.spark.sql.catalyst.TableIdentifier
+import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project}
 import org.apache.spark.sql.execution.command.RunnableCommand
 
 case class CreateTrieIndexCommand(tableName: TableIdentifier, column: String, indexName: String)
   extends RunnableCommand {
 
   override def run(sparkSession: SparkSession): Seq[Row] = {
-    val catalog = sparkSession.sessionState.catalog
-    if (catalog.lookupIndex(tableName, indexName, this).isEmpty) {
-      val table = sparkSession.table(tableName)
-      val resolver = sparkSession.sessionState.conf.resolver
-      val attribute = {
-       val exprOption = table.logicalPlan.output.find(attr => resolver(attr.name, column))
-        exprOption.getOrElse(throw new AnalysisException(s"Column $column does not exist."))
-      }
-      val child = sparkSession.sessionState.executePlan(table.logicalPlan).sparkPlan
-
-      val indexedRelation = TrieIndexedRelation(child, attribute)()
-      catalog.createIndex(tableName, indexName, table.logicalPlan, indexedRelation)
-    }
+    val table = sparkSession.table(tableName)
+    CreateTrieIndexCommand.createTrieIndex(sparkSession, table.logicalPlan, column, indexName,
+      Some(tableName))
     Seq.empty[Row]
+  }
+}
+
+object CreateTrieIndexCommand extends Logging {
+  def createTrieIndex(sparkSession: SparkSession, logicalPlan: LogicalPlan, column: String,
+                      indexName: String, tableName: Option[TableIdentifier]): Unit = {
+    val catalog = sparkSession.sessionState.catalog
+    val attribute = {
+      val resolver = sparkSession.sessionState.conf.resolver
+      val exprOption = logicalPlan.output.find(attr => resolver(attr.name, column))
+      exprOption.getOrElse(throw new AnalysisException(s"Column $column does not exist."))
+    }
+    val project = sparkSession.sessionState.optimizer.execute(
+      Project(Seq(attribute), logicalPlan.children.head))
+
+    if (catalog.lookupIndex(tableName.orNull, indexName, project).isEmpty) {
+      val child = sparkSession.sessionState.executePlan(logicalPlan).sparkPlan
+      val indexedRelation = TrieIndexedRelation(child, attribute)()
+      catalog.createIndex(tableName.orNull, indexName, project, indexedRelation)
+    } else {
+      logWarning(s"Index $indexName on Table ${tableName.getOrElse("EMPTY")} exists!")
+    }
   }
 }

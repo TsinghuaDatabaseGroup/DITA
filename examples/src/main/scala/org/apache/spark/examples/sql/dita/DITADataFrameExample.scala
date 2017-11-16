@@ -41,14 +41,17 @@ object DITADataFrameExample {
     import spark.implicits._
 
     val df1 = spark.sparkContext
-      .textFile("examples/src/main/resources/trajectory.txt")
+      .textFile("examples/src/main/resources/trajectory_small.txt")
       .zipWithIndex().map(getTrajectory)
       .toDF()
+    df1.createOrReplaceTempView("traj1")
+    df1.createTrieIndex(df1("traj"), "traj_index1")
 
     val df2 = spark.sparkContext
-      .textFile("examples/src/main/resources/trajectory.txt")
+      .textFile("examples/src/main/resources/trajectory_small.txt")
       .zipWithIndex().map(getTrajectory)
       .toDF()
+    df2.createTrieIndex(df2("traj"), "traj_index2")
 
     df1.trajSimJoin(df2, df1("traj"), df2("traj"), TrajectorySimilarityFunction.DTW, 0.005).show()
 

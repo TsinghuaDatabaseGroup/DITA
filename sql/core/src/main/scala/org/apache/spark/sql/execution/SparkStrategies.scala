@@ -23,6 +23,7 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.encoders.RowEncoder
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate.First
+import org.apache.spark.sql.catalyst.expressions.dita.index.IndexedRelation
 import org.apache.spark.sql.catalyst.planning._
 import org.apache.spark.sql.catalyst.plans._
 import org.apache.spark.sql.catalyst.plans.logical._
@@ -156,7 +157,7 @@ abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
 
       // Pick Trajectory Simialrity Join
       case ExtractTrajectorySimilarityJoin(joinType, leftKey, rightKey, function, threshold, left, right) =>
-        TrajectorySimilarityJoinExec(leftKey, rightKey, function, threshold, planLater(left), planLater(right)) :: Nil
+        TrajectorySimilarityJoinExec(leftKey, rightKey, function, threshold, left, right, planLater(left), planLater(right)) :: Nil
 
       // --- BroadcastHashJoin --------------------------------------------------------------------
 
