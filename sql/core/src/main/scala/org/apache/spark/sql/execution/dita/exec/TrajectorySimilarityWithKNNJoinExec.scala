@@ -19,15 +19,13 @@ package org.apache.spark.sql.execution.dita.exec
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeRowJoiner
-import org.apache.spark.sql.catalyst.expressions.dita.{TrajectorySimilarityExpression, TrajectorySimilarityFunction}
 import org.apache.spark.sql.catalyst.expressions.dita.common.shape.{Point, Rectangle, Shape}
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.{Trajectory, TrajectorySimilarity}
-import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Expression, JoinedRow, UnsafeArrayData, UnsafeRow}
+import org.apache.spark.sql.catalyst.expressions.dita.{TrajectorySimilarityExpression, TrajectorySimilarityFunction}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Expression, UnsafeArrayData}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.dita.rdd.TrieRDD
 import org.apache.spark.sql.execution.dita.sql.{DITAIternalRow, TrieIndexedRelation}
-import org.apache.spark.sql.execution.joins.UnsafeCartesianRDD
 import org.apache.spark.sql.execution.{BinaryExecNode, SparkPlan}
 
 
@@ -37,9 +35,6 @@ case class TrajectorySimilarityWithKNNJoinExec(leftKey: Expression, rightKey: Ex
                                                leftLogicalPlan: LogicalPlan, rightLogicalPlan: LogicalPlan,
                                                left: SparkPlan, right: SparkPlan) extends BinaryExecNode with Logging {
   override def output: Seq[Attribute] = left.output ++ right.output
-
-  val LAMBDA: Double = 2.0
-  val MIN_OPTIMIZATION_COUNT: Long = 1000
 
   sparkContext.conf.registerKryoClasses(Array(classOf[Shape], classOf[Point],
     classOf[Rectangle], classOf[Trajectory]))
@@ -54,55 +49,43 @@ case class TrajectorySimilarityWithKNNJoinExec(leftKey: Expression, rightKey: Ex
     val rightCount = rightResults.count()
     logWarning(s"Data count: $leftCount, $rightCount")
 
-    if (leftCount > MIN_OPTIMIZATION_COUNT && rightCount > MIN_OPTIMIZATION_COUNT) {
-      logWarning("Applying efficient trajectory similarity join algorithm!")
+    logWarning("Applying efficient trajectory similarity join algorithm!")
 
-      val distanceFunction = TrajectorySimilarity.getDistanceFunction(function)
+    val distanceFunction = TrajectorySimilarity.getDistanceFunction(function)
 
-      val leftTrieRDD = TrajectorySimilarityWithThresholdJoinExec
-        .getIndexedRelation(sqlContext, leftLogicalPlan)
-        .map(_.asInstanceOf[TrieIndexedRelation].trieRDD)
-        .getOrElse({
-          logWarning("Building left trie RDD")
-          val leftRDD = leftResults.map(row =>
-            new DITAIternalRow(row, TrajectorySimilarityExpression.getPoints(
-              BindReferences.bindReference(leftKey, left.output)
-                .eval(row).asInstanceOf[UnsafeArrayData]))).asInstanceOf[RDD[Trajectory]]
-          new TrieRDD(leftRDD)
-        })
+    val leftTrieRDD = TrajectorySimilarityWithThresholdJoinExec
+      .getIndexedRelation(sqlContext, leftLogicalPlan)
+      .map(_.asInstanceOf[TrieIndexedRelation].trieRDD)
+      .getOrElse({
+        logWarning("Building left trie RDD")
+        val leftRDD = leftResults.map(row =>
+          new DITAIternalRow(row, TrajectorySimilarityExpression.getPoints(
+            BindReferences.bindReference(leftKey, left.output)
+              .eval(row).asInstanceOf[UnsafeArrayData]))).asInstanceOf[RDD[Trajectory]]
+        new TrieRDD(leftRDD)
+      })
 
-      val rightTrieRDD = TrajectorySimilarityWithThresholdJoinExec
-        .getIndexedRelation(sqlContext, rightLogicalPlan)
-        .map(_.asInstanceOf[TrieIndexedRelation].trieRDD)
-        .getOrElse({
-          logWarning("Building right trie RDD")
-          val rightRDD = rightResults.map(row =>
-            new DITAIternalRow(row, TrajectorySimilarityExpression.getPoints(
-              BindReferences.bindReference(rightKey, right.output)
-                .eval(row).asInstanceOf[UnsafeArrayData]))).asInstanceOf[RDD[Trajectory]]
-          new TrieRDD(rightRDD)
-        })
+    val rightTrieRDD = TrajectorySimilarityWithThresholdJoinExec
+      .getIndexedRelation(sqlContext, rightLogicalPlan)
+      .map(_.asInstanceOf[TrieIndexedRelation].trieRDD)
+      .getOrElse({
+        logWarning("Building right trie RDD")
+        val rightRDD = rightResults.map(row =>
+          new DITAIternalRow(row, TrajectorySimilarityExpression.getPoints(
+            BindReferences.bindReference(rightKey, right.output)
+              .eval(row).asInstanceOf[UnsafeArrayData]))).asInstanceOf[RDD[Trajectory]]
+        new TrieRDD(rightRDD)
+      })
 
-      // get answer
-      val join = TrajectorySimilarityWithKNNJoinAlgorithms.DistributedJoin
-      val answerRDD = join.join(sparkContext, leftTrieRDD, rightTrieRDD,
-        distanceFunction, count)
-      val outputRDD = answerRDD.mapPartitions { iter =>
-        iter.map(x => InternalRow(x._1.asInstanceOf[DITAIternalRow].row,
-            x._2.asInstanceOf[DITAIternalRow].row, x._3))
-      }
-      outputRDD.asInstanceOf[RDD[InternalRow]]
-    } else {
-      val spillThreshold = sqlContext.conf.cartesianProductExecBufferSpillThreshold
-      val pair = new UnsafeCartesianRDD(leftResults.asInstanceOf[RDD[UnsafeRow]],
-        rightResults.asInstanceOf[RDD[UnsafeRow]], right.output.size, spillThreshold)
-      pair.mapPartitionsWithIndexInternal { (index, iter) =>
-        val joiner = GenerateUnsafeRowJoiner.create(left.schema, right.schema)
-        iter.map { r =>
-          joiner.join(r._1, r._2)
-        }
-      }
+    // get answer
+    val join = TrajectorySimilarityWithKNNJoinAlgorithms.DistributedJoin
+    val answerRDD = join.join(sparkContext, leftTrieRDD, rightTrieRDD,
+      distanceFunction, count)
+    val outputRDD = answerRDD.mapPartitions { iter =>
+      iter.map(x => InternalRow(x._1.asInstanceOf[DITAIternalRow].row,
+          x._2.asInstanceOf[DITAIternalRow].row, x._3))
     }
+    outputRDD.asInstanceOf[RDD[InternalRow]]
   }
 }
 

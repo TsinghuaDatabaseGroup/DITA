@@ -107,7 +107,9 @@ object TrajectorySimilarityWithKNNJoinAlgorithms {
               .sorted.take(count).iterator
           }
         }.collect().sorted.take(count)
-        finalThreshold = math.min(finalThreshold, allThresholds.last)
+        if (allThresholds.nonEmpty) {
+          finalThreshold= math.min(finalThreshold, allThresholds.last)
+        }
         sampleRate *= 10
       }
 
