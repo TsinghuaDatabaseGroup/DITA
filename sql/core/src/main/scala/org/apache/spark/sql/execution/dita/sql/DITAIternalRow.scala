@@ -16,10 +16,10 @@
 
 package org.apache.spark.sql.execution.dita.sql
 
-import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.expressions.UnsafeRow
 import org.apache.spark.sql.catalyst.expressions.dita.common.shape.Point
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.Trajectory
 
-class DITAIternalRow(internalRow: InternalRow, points: Array[Point]) extends Trajectory(points) {
-  var row: InternalRow = internalRow
+class DITAIternalRow(unsafeRow: UnsafeRow, points: Array[Point]) extends Trajectory(points) {
+  var row: UnsafeRow = unsafeRow
 }

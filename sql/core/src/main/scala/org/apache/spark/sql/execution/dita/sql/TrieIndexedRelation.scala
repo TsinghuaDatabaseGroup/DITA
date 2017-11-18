@@ -18,7 +18,7 @@ package org.apache.spark.sql.execution.dita.sql
 
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.analysis.MultiInstanceRelation
-import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, UnsafeArrayData}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, UnsafeArrayData, UnsafeRow}
 import org.apache.spark.sql.catalyst.expressions.dita.{PackedPartition, TrajectorySimilarityExpression}
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.Trajectory
 import org.apache.spark.sql.catalyst.expressions.dita.index.{GlobalIndex, IndexedRelation}
@@ -42,7 +42,7 @@ case class TrieIndexedRelation(child: SparkPlan, key: Attribute)
   }
 
   private def buildIndex(): TrieRDD = {
-    val dataRDD = child.execute().map(row =>
+    val dataRDD = child.execute().asInstanceOf[RDD[UnsafeRow]].map(row =>
       new DITAIternalRow(row, TrajectorySimilarityExpression.getPoints(
         BindReferences.bindReference(key, child.output)
           .eval(row).asInstanceOf[UnsafeArrayData]))).asInstanceOf[RDD[Trajectory]]

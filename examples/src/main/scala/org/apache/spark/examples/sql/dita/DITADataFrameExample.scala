@@ -18,6 +18,7 @@ package org.apache.spark.examples.sql.dita
 
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.expressions.dita.TrajectorySimilarityFunction
+import org.apache.spark.sql.catalyst.expressions.dita.common.DITAConfigConstants
 
 object DITADataFrameExample {
 
@@ -42,6 +43,8 @@ object DITADataFrameExample {
     val df1 = spark.sparkContext
       .textFile("examples/src/main/resources/trajectory_small.txt")
       .zipWithIndex().map(getTrajectory)
+      .filter(_.traj.length >= DITAConfigConstants.TRAJECTORY_MIN_LENGTH)
+      .filter(_.traj.length <= DITAConfigConstants.TRAJECTORY_MAX_LENGTH)
       .toDF()
     df1.createOrReplaceTempView("traj1")
     df1.createTrieIndex(df1("traj"), "traj_index1")
@@ -49,10 +52,14 @@ object DITADataFrameExample {
     val df2 = spark.sparkContext
       .textFile("examples/src/main/resources/trajectory_small.txt")
       .zipWithIndex().map(getTrajectory)
+      .filter(_.traj.length >= DITAConfigConstants.TRAJECTORY_MIN_LENGTH)
+      .filter(_.traj.length <= DITAConfigConstants.TRAJECTORY_MAX_LENGTH)
       .toDF()
     df2.createTrieIndex(df2("traj"), "traj_index2")
 
-    df1.trajSimJoin(df2, df1("traj"), df2("traj"), TrajectorySimilarityFunction.DTW, 0.005).show()
+    df1.trajectorySimilarityWithThresholdJoin(df2, df1("traj"), df2("traj"), TrajectorySimilarityFunction.DTW, 0.005).show()
+
+    df1.trajectorySimilarityWithKNNJoin(df2, df1("traj"), df2("traj"), TrajectorySimilarityFunction.DTW, 100).show()
 
     spark.stop()
   }

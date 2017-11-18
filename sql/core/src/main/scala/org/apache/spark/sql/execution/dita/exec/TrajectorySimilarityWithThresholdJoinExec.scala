@@ -20,11 +20,12 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.sql.catalyst.InternalRow
+import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeRowJoiner
 import org.apache.spark.sql.catalyst.expressions.dita.common.shape.{Point, Rectangle, Shape}
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.{Trajectory, TrajectorySimilarity}
 import org.apache.spark.sql.catalyst.expressions.dita.index.IndexedRelation
 import org.apache.spark.sql.catalyst.expressions.dita.{TrajectorySimilarityExpression, TrajectorySimilarityFunction}
-import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Expression, JoinedRow, UnsafeArrayData}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Expression, JoinedRow, UnsafeArrayData, UnsafeRow}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.dita.rdd.TrieRDD
 import org.apache.spark.sql.execution.dita.sql.{DITAIternalRow, TrieIndexedRelation}
@@ -60,7 +61,7 @@ case class TrajectorySimilarityWithThresholdJoinExec(leftKey: Expression, rightK
       .map(_.asInstanceOf[TrieIndexedRelation].trieRDD)
       .getOrElse({
         logWarning("Building left trie RDD")
-        val leftRDD = leftResults.map(row =>
+        val leftRDD = leftResults.asInstanceOf[RDD[UnsafeRow]].map(row =>
           new DITAIternalRow(row, TrajectorySimilarityExpression.getPoints(
             BindReferences.bindReference(leftKey, left.output)
               .eval(row).asInstanceOf[UnsafeArrayData]))).asInstanceOf[RDD[Trajectory]]
@@ -72,7 +73,7 @@ case class TrajectorySimilarityWithThresholdJoinExec(leftKey: Expression, rightK
       .map(_.asInstanceOf[TrieIndexedRelation].trieRDD)
       .getOrElse({
         logWarning("Building right trie RDD")
-        val rightRDD = rightResults.map(row =>
+        val rightRDD = rightResults.asInstanceOf[RDD[UnsafeRow]].map(row =>
           new DITAIternalRow(row, TrajectorySimilarityExpression.getPoints(
             BindReferences.bindReference(rightKey, right.output)
               .eval(row).asInstanceOf[UnsafeArrayData]))).asInstanceOf[RDD[Trajectory]]
@@ -85,8 +86,9 @@ case class TrajectorySimilarityWithThresholdJoinExec(leftKey: Expression, rightK
     val answerRDD = join.join(sparkContext, leftTrieRDD, rightTrieRDD,
       distanceFunction, threshold)
     val outputRDD = answerRDD.mapPartitions { iter =>
+      val joiner = GenerateUnsafeRowJoiner.create(left.schema, right.schema)
       iter.map(x =>
-        new JoinedRow(x._1.asInstanceOf[DITAIternalRow].row,
+        joiner.join(x._1.asInstanceOf[DITAIternalRow].row,
           x._2.asInstanceOf[DITAIternalRow].row))
     }
     outputRDD.asInstanceOf[RDD[InternalRow]]
