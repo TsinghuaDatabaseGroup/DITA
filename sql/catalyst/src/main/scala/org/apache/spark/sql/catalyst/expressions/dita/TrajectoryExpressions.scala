@@ -18,11 +18,11 @@ package org.apache.spark.sql.catalyst.expressions.dita
 
 import java.util.Locale
 
-import org.apache.spark.sql.catalyst.expressions.{BinaryExpression, Expression, UnsafeArrayData}
+import org.apache.spark.sql.catalyst.expressions.{BinaryExpression, Expression, Literal, UnsafeArrayData}
 import org.apache.spark.sql.catalyst.expressions.codegen.CodegenFallback
 import org.apache.spark.sql.catalyst.expressions.dita.common.shape.Point
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.{Trajectory, TrajectorySimilarity}
-import org.apache.spark.sql.types.{ArrayType, DataType, DoubleType}
+import org.apache.spark.sql.types.{ArrayType, BooleanType, DataType, DoubleType}
 
 case class TrajectorySimilarityExpression(function: TrajectorySimilarityFunction,
                                           traj1: Expression, traj2: Expression)
@@ -52,6 +52,34 @@ object TrajectorySimilarityExpression {
   def getTrajectory(rawData: UnsafeArrayData): Trajectory = {
     Trajectory((0 until rawData.numElements()).map(i =>
       Point(rawData.getArray(i).toDoubleArray)).toArray)
+  }
+}
+
+case class TrajectorySimilarityWithThresholdExpression(similarity: TrajectorySimilarityExpression,
+                                                       threshold: Double)
+  extends BinaryExpression with CodegenFallback {
+
+  override def left: Expression = similarity
+  override def right: Expression = Literal(threshold)
+
+  override def dataType: DataType = BooleanType
+
+  override def nullSafeEval(left: Any, right: Any): Any = {
+    left.asInstanceOf[Double] <= threshold
+  }
+}
+
+case class TrajectorySimilarityWithKNNExpression(similarity: TrajectorySimilarityExpression,
+                                                 count: Int)
+  extends BinaryExpression with CodegenFallback {
+
+  override def left: Expression = similarity
+  override def right: Expression = Literal(count)
+
+  override def dataType: DataType = BooleanType
+
+  override def nullSafeEval(left: Any, right: Any): Any = {
+    throw new NotImplementedError()
   }
 }
 

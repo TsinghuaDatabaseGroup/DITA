@@ -549,7 +549,9 @@ trajectorySimilarityFunction
     ;
 
 valueExpression
-    : primaryExpression                                                                      #valueExpressionDefault
+    : trajectorySimilarityExpression LTE threshold=number                                    #trajectorySimilarityWithThreshold
+    | trajectorySimilarityExpression KNN count=number                                        #trajectorySimilarityWithKNN
+    | primaryExpression                                                                      #valueExpressionDefault
     | operator=(MINUS | PLUS | TILDE) valueExpression                                        #arithmeticUnary
     | left=valueExpression operator=(ASTERISK | SLASH | PERCENT | DIV) right=valueExpression #arithmeticBinary
     | left=valueExpression operator=(PLUS | MINUS) right=valueExpression                     #arithmeticBinary
@@ -560,25 +562,28 @@ valueExpression
     ;
 
 primaryExpression
-    : name=(CURRENT_DATE | CURRENT_TIMESTAMP)                                                           #timeFunctionCall
-    | function=trajectorySimilarityFunction '(' left=primaryExpression ',' right=primaryExpression ')'  #trajectorySimilarity
-    | CASE whenClause+ (ELSE elseExpression=expression)? END                                            #searchedCase
-    | CASE value=expression whenClause+ (ELSE elseExpression=expression)? END                           #simpleCase
-    | CAST '(' expression AS dataType ')'                                                               #cast
-    | STRUCT '(' (argument+=namedExpression (',' argument+=namedExpression)*)? ')'                      #struct
-    | FIRST '(' expression (IGNORE NULLS)? ')'                                                          #first
-    | LAST '(' expression (IGNORE NULLS)? ')'                                                           #last
-    | constant                                                                                          #constantDefault
-    | ASTERISK                                                                                          #star
-    | qualifiedName '.' ASTERISK                                                                        #star
-    | '(' namedExpression (',' namedExpression)+ ')'                                                    #rowConstructor
-    | '(' query ')'                                                                                     #subqueryExpression
+    : name=(CURRENT_DATE | CURRENT_TIMESTAMP)                                                  #timeFunctionCall
+    | CASE whenClause+ (ELSE elseExpression=expression)? END                                   #searchedCase
+    | CASE value=expression whenClause+ (ELSE elseExpression=expression)? END                  #simpleCase
+    | CAST '(' expression AS dataType ')'                                                      #cast
+    | STRUCT '(' (argument+=namedExpression (',' argument+=namedExpression)*)? ')'             #struct
+    | FIRST '(' expression (IGNORE NULLS)? ')'                                                 #first
+    | LAST '(' expression (IGNORE NULLS)? ')'                                                  #last
+    | constant                                                                                 #constantDefault
+    | ASTERISK                                                                                 #star
+    | qualifiedName '.' ASTERISK                                                               #star
+    | '(' namedExpression (',' namedExpression)+ ')'                                           #rowConstructor
+    | '(' query ')'                                                                            #subqueryExpression
     | qualifiedName '(' (setQuantifier? argument+=expression (',' argument+=expression)*)? ')'
-       (OVER windowSpec)?                                                                               #functionCall
-    | value=primaryExpression '[' index=valueExpression ']'                                             #subscript
-    | identifier                                                                                        #columnReference
-    | base=primaryExpression '.' fieldName=identifier                                                   #dereference
-    | '(' expression ')'                                                                                #parenthesizedExpression
+       (OVER windowSpec)?                                                                      #functionCall
+    | value=primaryExpression '[' index=valueExpression ']'                                    #subscript
+    | identifier                                                                               #columnReference
+    | base=primaryExpression '.' fieldName=identifier                                          #dereference
+    | '(' expression ')'                                                                       #parenthesizedExpression
+    ;
+
+trajectorySimilarityExpression
+    : function=trajectorySimilarityFunction '(' left=primaryExpression ',' right=primaryExpression ')'  #trajectorySimilarity
     ;
 
 constant
@@ -979,6 +984,9 @@ LCSS: 'LCSS';
 
 // Trie Index
 TRIE: 'TRIE';
+
+// KNN
+KNN: 'KNN';
 
 STRING
     : '\'' ( ~('\''|'\\') | ('\\' .) )* '\''

@@ -25,6 +25,10 @@ case class LocalTrieIndex(partitioner: LocalTriePartitioner) extends LocalIndex 
     partitioner.getCandidates(key, threshold, 0.0).filter(_._2 <= threshold).map(_._1)
   }
 
+  def getCandidatesWithDistances(key: Trajectory, threshold: Double): List[(Trajectory, Double)] = {
+    partitioner.getCandidates(key, threshold, 0.0)
+  }
+
   /*
   def getCandidates(key: Shape, threshold: Double): List[Trajectory] = {
     partitioner.getCandidates(key, threshold)

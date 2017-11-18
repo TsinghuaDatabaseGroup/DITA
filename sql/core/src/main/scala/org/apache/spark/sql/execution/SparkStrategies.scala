@@ -31,7 +31,8 @@ import org.apache.spark.sql.catalyst.plans.physical._
 import org.apache.spark.sql.execution
 import org.apache.spark.sql.execution.columnar.{InMemoryRelation, InMemoryTableScanExec}
 import org.apache.spark.sql.execution.command._
-import org.apache.spark.sql.execution.dita.sql.{ExtractTrajectorySimilarityJoin, TrajectorySimilarityJoinExec}
+import org.apache.spark.sql.execution.dita.exec.{TrajectorySimilarityWithKNNJoinExec, TrajectorySimilarityWithThresholdJoinExec}
+import org.apache.spark.sql.execution.dita.sql.{ExtractTrajectorySimilarityWithKNNJoin, ExtractTrajectorySimilarityWithThresholdJoin}
 import org.apache.spark.sql.execution.exchange.ShuffleExchange
 import org.apache.spark.sql.execution.joins.{BuildLeft, BuildRight}
 import org.apache.spark.sql.execution.streaming._
@@ -156,8 +157,13 @@ abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
     def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
 
       // Pick Trajectory Simialrity Join
-      case ExtractTrajectorySimilarityJoin(joinType, leftKey, rightKey, function, threshold, left, right) =>
-        TrajectorySimilarityJoinExec(leftKey, rightKey, function, threshold, left, right, planLater(left), planLater(right)) :: Nil
+      case ExtractTrajectorySimilarityWithThresholdJoin(joinType, leftKey, rightKey, function, threshold, left, right) =>
+        TrajectorySimilarityWithThresholdJoinExec(leftKey, rightKey,
+          function, threshold, left, right, planLater(left), planLater(right)) :: Nil
+      case ExtractTrajectorySimilarityWithKNNJoin(joinType, leftKey, rightKey, function, count, left, right) =>
+        TrajectorySimilarityWithKNNJoinExec(leftKey, rightKey,
+          function, count, left, right, planLater(left), planLater(right)) :: Nil
+
 
       // --- BroadcastHashJoin --------------------------------------------------------------------
 

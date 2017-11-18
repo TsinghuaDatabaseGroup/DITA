@@ -70,7 +70,13 @@ object DITASQLExample {
     spark.sql("SELECT COUNT(*) FROM traj1 JOIN traj2 ON DTW(traj1.traj, traj2.traj) <= 0.005")
       .show()
     end = System.currentTimeMillis()
-    println(s"Join Running time: ${end - start} ms")
+    println(s"Threshold Join Running time: ${end - start} ms")
+
+    start = System.currentTimeMillis()
+    spark.sql("SELECT COUNT(*) FROM traj1 JOIN traj2 ON DTW(traj1.traj, traj2.traj) KNN 100")
+      .show()
+    end = System.currentTimeMillis()
+    println(s"KNN Join Running time: ${end - start} ms")
 
     spark.stop()
   }

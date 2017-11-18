@@ -17,7 +17,7 @@
 package org.apache.spark.sql.execution.dita.sql
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.catalyst.expressions.dita.{TrajectorySimilarityExpression, TrajectorySimilarityFunction}
+import org.apache.spark.sql.catalyst.expressions.dita.{TrajectorySimilarityExpression, TrajectorySimilarityFunction, TrajectorySimilarityWithKNNExpression, TrajectorySimilarityWithThresholdExpression}
 import org.apache.spark.sql.catalyst.expressions.{Expression, LessThanOrEqual, Literal, PredicateHelper}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.plans.{JoinType, logical}
@@ -25,17 +25,39 @@ import org.apache.spark.sql.catalyst.plans.{JoinType, logical}
 /**
   * A pattern that finds joins with trajectory similarity conditions.
   */
-object ExtractTrajectorySimilarityJoin extends Logging with PredicateHelper {
+object ExtractTrajectorySimilarityWithThresholdJoin extends Logging with PredicateHelper {
   type ReturnType =
-    (JoinType, Expression, Expression, TrajectorySimilarityFunction, Literal, LogicalPlan, LogicalPlan)
+    (JoinType, Expression, Expression, TrajectorySimilarityFunction, Double, LogicalPlan, LogicalPlan)
 
   def unapply(plan: LogicalPlan): Option[ReturnType] = plan match {
     case logical.Join(left, right, joinType, condition) =>
       logDebug(s"Considering join on: $condition")
       if (condition.isDefined) {
         condition.get match {
-          case LessThanOrEqual(TrajectorySimilarityExpression(function, traj1, traj2), threshold) =>
-            Some((joinType, traj1, traj2, function, threshold.asInstanceOf[Literal], left, right))
+          case TrajectorySimilarityWithThresholdExpression(similarity, threshold) =>
+            Some((joinType, similarity.traj1, similarity.traj2, similarity.function,
+              threshold, left, right))
+          case _ => None
+        }
+      } else {
+        None
+      }
+    case _ => None
+  }
+}
+
+object ExtractTrajectorySimilarityWithKNNJoin extends Logging with PredicateHelper {
+  type ReturnType =
+    (JoinType, Expression, Expression, TrajectorySimilarityFunction, Int, LogicalPlan, LogicalPlan)
+
+  def unapply(plan: LogicalPlan): Option[ReturnType] = plan match {
+    case logical.Join(left, right, joinType, condition) =>
+      logDebug(s"Considering join on: $condition")
+      if (condition.isDefined) {
+        condition.get match {
+          case TrajectorySimilarityWithKNNExpression(similarity, count) =>
+            Some((joinType, similarity.traj1, similarity.traj2, similarity.function,
+              count, left, right))
           case _ => None
         }
       } else {
