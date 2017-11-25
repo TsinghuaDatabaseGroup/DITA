@@ -19,6 +19,8 @@ package org.apache.spark.examples.sql.dita
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.expressions.dita.TrajectorySimilarityFunction
 import org.apache.spark.sql.catalyst.expressions.dita.common.DITAConfigConstants
+import org.apache.spark.sql.catalyst.expressions.dita.common.shape.Point
+import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.Trajectory
 
 object DITADataFrameExample {
 
@@ -40,12 +42,12 @@ object DITADataFrameExample {
     // For implicit conversions like converting RDDs to DataFrames
     import spark.implicits._
 
-    val df1 = spark.sparkContext
+    val trajs = spark.sparkContext
       .textFile("examples/src/main/resources/trajectory_small.txt")
       .zipWithIndex().map(getTrajectory)
       .filter(_.traj.length >= DITAConfigConstants.TRAJECTORY_MIN_LENGTH)
       .filter(_.traj.length <= DITAConfigConstants.TRAJECTORY_MAX_LENGTH)
-      .toDF()
+    val df1 = trajs.toDF()
     df1.createOrReplaceTempView("traj1")
     df1.createTrieIndex(df1("traj"), "traj_index1")
 
@@ -57,9 +59,18 @@ object DITADataFrameExample {
       .toDF()
     df2.createTrieIndex(df2("traj"), "traj_index2")
 
-    df1.trajectorySimilarityWithThresholdJoin(df2, df1("traj"), df2("traj"), TrajectorySimilarityFunction.DTW, 0.005).show()
+    val queryTrajectory = Trajectory(trajs.take(1).head.traj.map(Point))
+    df1.trajectorySimilarityWithThresholdSearch(queryTrajectory, df1("traj"),
+      TrajectorySimilarityFunction.DTW, 0.005).show()
 
-    df1.trajectorySimilarityWithKNNJoin(df2, df1("traj"), df2("traj"), TrajectorySimilarityFunction.DTW, 100).show()
+    df1.trajectorySimilarityWithKNNSearch(queryTrajectory, df1("traj"),
+      TrajectorySimilarityFunction.DTW, 100).show()
+
+    df1.trajectorySimilarityWithThresholdJoin(df2, df1("traj"), df2("traj"),
+      TrajectorySimilarityFunction.DTW, 0.005).show()
+
+    df1.trajectorySimilarityWithKNNJoin(df2, df1("traj"), df2("traj"),
+      TrajectorySimilarityFunction.DTW, 100).show()
 
     spark.stop()
   }

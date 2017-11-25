@@ -37,6 +37,7 @@ import org.apache.spark.sql.catalyst.catalog.CatalogRelation
 import org.apache.spark.sql.catalyst.encoders._
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
+import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.Trajectory
 import org.apache.spark.sql.catalyst.expressions.dita.{TrajectorySimilarityExpression, TrajectorySimilarityFunction, TrajectorySimilarityWithKNNExpression, TrajectorySimilarityWithThresholdExpression}
 import org.apache.spark.sql.catalyst.json.{JSONOptions, JacksonGenerator}
 import org.apache.spark.sql.catalyst.optimizer.CombineUnions
@@ -902,6 +903,17 @@ class Dataset[T] private[sql](
   }
 
   /*
+   * Trajectory similarity with threshold search
+   */
+  def trajectorySimilarityWithThresholdSearch(query: Trajectory, key: Column,
+                                              function: TrajectorySimilarityFunction,
+                                              threshold: Double): DataFrame = withPlan {
+    val trajectorySimilarityExpression = TrajectorySimilarityExpression(function, Literal(query, DataTypes.NullType), key.expr)
+    val condition = TrajectorySimilarityWithThresholdExpression(trajectorySimilarityExpression, threshold)
+    Filter(condition, logicalPlan)
+  }
+
+  /*
    * Trajectory similarity with threshold join
    */
   def trajectorySimilarityWithThresholdJoin(right: Dataset[_], leftKey: Column, rightKey: Column,
@@ -910,6 +922,17 @@ class Dataset[T] private[sql](
     val trajectorySimilarityExpression = TrajectorySimilarityExpression(function, leftKey.expr, rightKey.expr)
     val condition = TrajectorySimilarityWithThresholdExpression(trajectorySimilarityExpression, threshold)
     Join(logicalPlan, right.logicalPlan, joinType = Inner, Some(condition))
+  }
+
+  /*
+   * Trajectory similarity with knn search
+   */
+  def trajectorySimilarityWithKNNSearch(query: Trajectory, key: Column,
+                                        function: TrajectorySimilarityFunction,
+                                        count: Int): DataFrame = withPlan {
+    val trajectorySimilarityExpression = TrajectorySimilarityExpression(function, Literal(query, DataTypes.NullType), key.expr)
+    val condition = TrajectorySimilarityWithKNNExpression(trajectorySimilarityExpression, count)
+    Filter(condition, logicalPlan)
   }
 
   /*

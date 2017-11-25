@@ -1102,7 +1102,7 @@ class AstBuilder(conf: SQLConf) extends SqlBaseBaseVisitor[AnyRef] with Logging 
    */
   override def visitPointExpression(ctx: SqlBaseParser.PointExpressionContext):
   Literal = withOrigin(ctx) {
-    Literal(Point(ctx.coords.asScala.map(_.getText.toDouble).toArray), null)
+    Literal(Point(ctx.coords.asScala.map(_.getText.toDouble).toArray), DataTypes.NullType)
   }
 
   /*
@@ -1111,7 +1111,7 @@ class AstBuilder(conf: SQLConf) extends SqlBaseBaseVisitor[AnyRef] with Logging 
   override def visitTrajectoryExpression(ctx: TrajectoryExpressionContext):
   Literal = withOrigin(ctx) {
     Literal(
-      Trajectory(ctx.points.asScala.map(x => visitPointExpression(x).value.asInstanceOf[Point]).toArray), null)
+      Trajectory(ctx.points.asScala.map(x => visitPointExpression(x).value.asInstanceOf[Point]).toArray), DataTypes.NullType)
   }
 
   /**
