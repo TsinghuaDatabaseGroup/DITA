@@ -33,27 +33,25 @@ import scala.util.control.Breaks
 
 object TrajectorySimilarityWithThresholdAlgorithms {
 
-  object LocalJoin {
-    def join(partitionIter: Iterator[PackedPartition],
-             trajectoryIter: Iterator[Trajectory],
-             distanceFunction: TrajectorySimilarity,
-             threshold: Double): Iterator[(Trajectory, Trajectory, Double)] = {
-      val packedPartition = partitionIter.next()
-      val localIndex = packedPartition.indexes.filter(_.isInstanceOf[LocalTrieIndex]).head
-        .asInstanceOf[LocalTrieIndex]
-      val queryTrajectories = trajectoryIter.toList
-      queryTrajectories.foreach(_.refresh(threshold))
+  def localJoin(partitionIter: Iterator[PackedPartition],
+           trajectoryIter: Iterator[Trajectory],
+           distanceFunction: TrajectorySimilarity,
+           threshold: Double): Iterator[(Trajectory, Trajectory, Double)] = {
+    val packedPartition = partitionIter.next()
+    val localIndex = packedPartition.indexes.filter(_.isInstanceOf[LocalTrieIndex]).head
+      .asInstanceOf[LocalTrieIndex]
+    val queryTrajectories = trajectoryIter.toList
+    queryTrajectories.foreach(_.refresh(threshold))
 
-      val answerPairs = queryTrajectories.flatMap(query => {
-        val indexCandidates = localIndex.getCandidates(query, threshold)
-        val mbrCandidates = indexCandidates.filter(t => query.getExtendedMBR.contains(t.getMBR))
-        mbrCandidates.map(t => (t, distanceFunction.evalWithTrajectory(query, t, threshold)))
-          .filter(t => t._2 <= threshold)
-          .map(t => (query, t._1, t._2))
-      })
+    val answerPairs = queryTrajectories.flatMap(query => {
+      val indexCandidates = localIndex.getCandidates(query, threshold)
+      val mbrCandidates = indexCandidates.filter(t => query.getExtendedMBR.contains(t.getMBR))
+      mbrCandidates.map(t => (t, distanceFunction.evalWithTrajectory(query, t, threshold)))
+        .filter(t => t._2 <= threshold)
+        .map(t => (query, t._1, t._2))
+    })
 
-      answerPairs.iterator
-    }
+    answerPairs.iterator
   }
 
   object DistributedSearch {
@@ -66,7 +64,7 @@ object TrajectorySimilarityWithThresholdAlgorithms {
       val candidatePartitions = globalTrieIndex.getPartitions(query, threshold)
       PartitionPruningRDD.create(trieRDD.packedRDD, candidatePartitions.contains)
         .mapPartitions(iter =>
-          LocalJoin.join(iter, Iterator(bQuery.value), distanceFunction, threshold)
+          localJoin(iter, Iterator(bQuery.value), distanceFunction, threshold)
             .map(x => (x._2, x._3)))
     }
   }
@@ -101,7 +99,8 @@ object TrajectorySimilarityWithThresholdAlgorithms {
         val packedPartition = partitionIter.next()
         val localTrieIndex = packedPartition.indexes
           .filter(_.isInstanceOf[LocalTrieIndex]).head.asInstanceOf[LocalTrieIndex]
-        val candidatesCount = trajectoryIter.map(t => localTrieIndex.getCandidates(t, threshold).size)
+        val candidatesCount = trajectoryIter
+          .map(t => localTrieIndex.getCandidates(t, threshold).size)
           .sum
         Array((packedPartition.id, candidatesCount)).iterator
       }.collect()
@@ -126,7 +125,7 @@ object TrajectorySimilarityWithThresholdAlgorithms {
         .mapPartitionsWithIndex((idx, iter) =>
           if (!bBalancingPartitions.value.contains(idx)) iter else Iterator())
       val normalAnswerRDD = leftTrieRDD.packedRDD.zipPartitions(normalPartitionedRightCandidatesRDD) { case (partitionIter, trajectoryIter) =>
-        LocalJoin.join(partitionIter, trajectoryIter, distanceFunction, threshold)
+        localJoin(partitionIter, trajectoryIter, distanceFunction, threshold)
       }
 
       if (balancingPartitions.isEmpty) {
@@ -164,7 +163,7 @@ object TrajectorySimilarityWithThresholdAlgorithms {
 
         val balancingAnswerRDD = balancingLeftRDD
           .zipPartitions(balancingPartitionedRightCandidatesRDD) { case (partitionIter, trajectoryIter) =>
-            LocalJoin.join(partitionIter, trajectoryIter, distanceFunction, threshold)
+            localJoin(partitionIter, trajectoryIter, distanceFunction, threshold)
           }
 
         normalAnswerRDD.union(balancingAnswerRDD)
@@ -479,7 +478,7 @@ object TrajectorySimilarityWithThresholdAlgorithms {
       val normalPartitionedRightCandidatesRDD = partitionedRightCandidatesRDD.mapPartitionsWithIndex((idx, iter) =>
         if (!bBalancingPartitions.value.contains(idx)) iter else Iterator())
       val normalAnswerRDD = leftTrieRDD.packedRDD.zipPartitions(normalPartitionedRightCandidatesRDD) { case (partitionIter, trajectoryIter) =>
-        LocalJoin.join(partitionIter, trajectoryIter, distanceFunction, threshold)
+        localJoin(partitionIter, trajectoryIter, distanceFunction, threshold)
       }
 
       // balancing answer
@@ -518,7 +517,7 @@ object TrajectorySimilarityWithThresholdAlgorithms {
 
         val balancingAnswerRDD = balancingLeftRDD
           .zipPartitions(balancingPartitionedRightCandidatesRDD) { case (partitionIter, trajectoryIter) =>
-            LocalJoin.join(partitionIter, trajectoryIter, distanceFunction, threshold)
+            localJoin(partitionIter, trajectoryIter, distanceFunction, threshold)
           }
 
         normalAnswerRDD.union(balancingAnswerRDD)

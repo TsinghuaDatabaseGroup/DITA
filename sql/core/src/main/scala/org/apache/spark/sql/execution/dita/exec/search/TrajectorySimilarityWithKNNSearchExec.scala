@@ -24,16 +24,16 @@ import org.apache.spark.sql.catalyst.expressions.dita.TrajectorySimilarityFuncti
 import org.apache.spark.sql.catalyst.expressions.dita.common.shape.{Point, Rectangle, Shape}
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.{Trajectory, TrajectorySimilarity}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.execution.dita.algorithms.TrajectorySimilarityWithThresholdAlgorithms
+import org.apache.spark.sql.execution.dita.algorithms.TrajectorySimilarityWithKNNAlgorithms
 import org.apache.spark.sql.execution.dita.exec.TrajectoryExecUtils
 import org.apache.spark.sql.execution.dita.sql.DITAIternalRow
 import org.apache.spark.sql.execution.{SparkPlan, UnaryExecNode}
 
-case class TrajectorySimilarityWithThresholdSearchExec(leftQuery: Trajectory, rightKey: Expression,
-                                                       function: TrajectorySimilarityFunction,
-                                                       threshold: Double,
-                                                       rightLogicalPlan: LogicalPlan,
-                                                       right: SparkPlan)
+case class TrajectorySimilarityWithKNNSearchExec(leftQuery: Trajectory, rightKey: Expression,
+                                                 function: TrajectorySimilarityFunction,
+                                                 count: Int,
+                                                 rightLogicalPlan: LogicalPlan,
+                                                 right: SparkPlan)
   extends UnaryExecNode with Logging {
 
   override def output: Seq[Attribute] = right.output
@@ -46,7 +46,7 @@ case class TrajectorySimilarityWithThresholdSearchExec(leftQuery: Trajectory, ri
   protected override def doExecute(): RDD[InternalRow] = {
     val distanceFunction = TrajectorySimilarity.getDistanceFunction(function)
     logWarning(s"Distance function: $function")
-    logWarning(s"Threshold: $threshold")
+    logWarning(s"Count: $count")
 
     val rightResults = right.execute()
     val rightCount = rightResults.count()
@@ -58,9 +58,9 @@ case class TrajectorySimilarityWithThresholdSearchExec(leftQuery: Trajectory, ri
       rightKey, rightLogicalPlan, right)
 
     // get answer
-    val search = TrajectorySimilarityWithThresholdAlgorithms.DistributedSearch
+    val search = TrajectorySimilarityWithKNNAlgorithms.DistributedSearch
     val answerRDD = search.search(sparkContext, leftQuery,
-      rightTrieRDD, distanceFunction, threshold)
+      rightTrieRDD, distanceFunction, count)
     val outputRDD = answerRDD.map(x => x._1.asInstanceOf[DITAIternalRow].row)
     outputRDD.asInstanceOf[RDD[InternalRow]]
   }

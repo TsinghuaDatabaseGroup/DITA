@@ -32,7 +32,7 @@ import org.apache.spark.sql.execution
 import org.apache.spark.sql.execution.columnar.{InMemoryRelation, InMemoryTableScanExec}
 import org.apache.spark.sql.execution.command._
 import org.apache.spark.sql.execution.dita.exec.join.{TrajectorySimilarityWithKNNJoinExec, TrajectorySimilarityWithThresholdJoinExec}
-import org.apache.spark.sql.execution.dita.exec.search.TrajectorySimilarityWithThresholdSearchExec
+import org.apache.spark.sql.execution.dita.exec.search.{TrajectorySimilarityWithKNNSearchExec, TrajectorySimilarityWithThresholdSearchExec}
 import org.apache.spark.sql.execution.dita.sql.{ExtractTrajectorySimilarityWithKNNJoin, ExtractTrajectorySimilarityWithThresholdJoin}
 import org.apache.spark.sql.execution.exchange.ShuffleExchange
 import org.apache.spark.sql.execution.joins.{BuildLeft, BuildRight}
@@ -348,7 +348,25 @@ abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
           _ => exec) :: Nil
       case PhysicalOperation(projectList, filters, relation)
         if filters.exists(e => e.isInstanceOf[TrajectorySimilarityWithKNNExpression]) =>
-        Nil
+        val expressionWithThreshold = filters.find(e =>
+          e.isInstanceOf[TrajectorySimilarityWithKNNExpression]).get
+          .asInstanceOf[TrajectorySimilarityWithKNNExpression]
+        val count = expressionWithThreshold.count
+        val expression = expressionWithThreshold.similarity
+        val function = expression.function
+        val (leftQuery, rightKey) = expression.traj1 match {
+          case Literal(v, _) => (v.asInstanceOf[Trajectory], expression.traj2)
+          case _ => (expression.traj2.asInstanceOf[Literal].value.asInstanceOf[Trajectory],
+            expression.traj1)
+        }
+        val exec = TrajectorySimilarityWithKNNSearchExec(leftQuery,
+          rightKey, function, count, relation, planLater(relation))
+
+        pruneFilterProject(
+          projectList,
+          filters,
+          fs => fs.filter(f => !f.isInstanceOf[TrajectorySimilarityWithKNNExpression]),
+          _ => exec) :: Nil
       case _ => Nil
     }
   }

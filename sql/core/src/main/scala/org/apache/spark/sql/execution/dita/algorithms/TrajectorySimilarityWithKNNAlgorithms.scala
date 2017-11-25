@@ -19,8 +19,10 @@ package org.apache.spark.sql.execution.dita.algorithms
 import org.apache.spark.SparkContext
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.catalyst.expressions.dita.PackedPartition
 import org.apache.spark.sql.catalyst.expressions.dita.common.DITAConfigConstants
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.{Trajectory, TrajectorySimilarity}
+import org.apache.spark.sql.execution.dita.algorithms.TrajectorySimilarityWithKNNAlgorithms.DistributedJoin.logWarning
 import org.apache.spark.sql.execution.dita.index.global.GlobalTrieIndex
 import org.apache.spark.sql.execution.dita.index.local.LocalTrieIndex
 import org.apache.spark.sql.execution.dita.partition.global.ExactKeyPartitioner
@@ -30,7 +32,78 @@ import scala.util.Random
 
 object TrajectorySimilarityWithKNNAlgorithms {
 
+  def getThresholdLocal(partitionIter: Iterator[PackedPartition],
+                        trajectoryIter: Iterator[Trajectory],
+                        distanceFunction: TrajectorySimilarity,
+                        count: Int, initThreshold: Double): Iterator[Double] = {
+    val packedPartition = partitionIter.next()
+    val localIndex = packedPartition.indexes.filter(_.isInstanceOf[LocalTrieIndex])
+      .head.asInstanceOf[LocalTrieIndex]
+
+    if (trajectoryIter.isEmpty) {
+      Array.empty[Double].iterator
+    } else {
+      val queryTrajectories = trajectoryIter.toArray
+      var finalCandidates =
+        Random.shuffle(packedPartition.data.asInstanceOf[Array[Trajectory]].toList)
+          .take(DITAConfigConstants.KNN_COEFFICIENT * count).toArray
+          .map((queryTrajectories(Random.nextInt(queryTrajectories.length)), _, DITAConfigConstants.THRESHOLD_LIMIT))
+
+      var threshold: Double = initThreshold
+      var iteration = 1
+      var canExit = false
+      while (!canExit) {
+        threshold = threshold / 2.0
+        val candidates = queryTrajectories.flatMap(query =>
+          localIndex.getCandidatesWithDistances(query, threshold).map(x => (x._1, query, x._2)))
+        if (candidates.length >= DITAConfigConstants.KNN_COEFFICIENT * count) {
+          finalCandidates = candidates
+        }
+        if (candidates.length < DITAConfigConstants.KNN_COEFFICIENT * count
+          || iteration > DITAConfigConstants.KNN_MAX_LOCAL_ITERATION) {
+          canExit = true
+        }
+        iteration += 1
+      }
+
+      finalCandidates.sortBy(_._3).take(DITAConfigConstants.KNN_COEFFICIENT * count)
+        .map(x => distanceFunction.evalWithTrajectory(x._1, x._2, initThreshold))
+        .sorted.take(count).iterator
+    }
+  }
+
+  object DistributedSearch extends Logging {
+    implicit val order = new Ordering[(Trajectory, Double)] {
+      def compare(x: (Trajectory, Double), y: (Trajectory, Double)): Int = {
+        x._2.compare(y._2)
+      }
+    }
+
+    def search(sparkContext: SparkContext, query: Trajectory, trieRDD: TrieRDD,
+               distanceFunction: TrajectorySimilarity,
+               count: Int): RDD[(Trajectory, Double)] = {
+      val bQuery = sparkContext.broadcast(query)
+
+      val threshold = trieRDD.packedRDD.mapPartitions(iter =>
+        getThresholdLocal(iter, Iterator(query), distanceFunction, count, Double.MaxValue))
+        .collect().sorted.take(count).last
+      logWarning(s"Threshold: $threshold")
+
+      val answerRDD = TrajectorySimilarityWithThresholdAlgorithms.DistributedSearch.search(
+        sparkContext, query, trieRDD, distanceFunction, threshold)
+      logWarning(s"Answer Count: ${answerRDD.count()}")
+
+      sparkContext.parallelize(answerRDD.takeOrdered(count))
+    }
+  }
+
   object DistributedJoin extends Logging {
+    implicit val order = new Ordering[(Trajectory, Trajectory, Double)] {
+      def compare(x: (Trajectory, Trajectory, Double), y: (Trajectory, Trajectory, Double)): Int = {
+        x._3.compare(y._3)
+      }
+    }
+
     def join(sparkContext: SparkContext, leftTrieRDD: TrieRDD, rightTrieRDD: TrieRDD,
              distanceFunction: TrajectorySimilarity,
              count: Int): RDD[(Trajectory, Trajectory, Double)] = {
@@ -40,12 +113,6 @@ object TrajectorySimilarityWithKNNAlgorithms {
         .join(sparkContext, leftTrieRDD, rightTrieRDD, distanceFunction, threshold)
       logWarning(s"Answer Count: ${answerRDD.count()}")
       sparkContext.parallelize(answerRDD.takeOrdered(count))
-    }
-
-    implicit val order = new Ordering[(Trajectory, Trajectory, Double)] {
-      def compare(x: (Trajectory, Trajectory, Double), y: (Trajectory, Trajectory, Double)): Int = {
-        x._3.compare(y._3)
-      }
     }
 
     private def getThreshold(sparkContext: SparkContext,
@@ -72,43 +139,10 @@ object TrajectorySimilarityWithKNNAlgorithms {
       for {_ <- 1 to DITAConfigConstants.KNN_MAX_GLOBAL_ITERATION} {
         val allThresholds = leftTrieRDD.packedRDD.zipPartitions(
           partitionedRightSingleCandidatesRDD.sample(withReplacement = true, sampleRate)) { case (partitionIter, trajectoryIter) =>
-          val packedPartition = partitionIter.next()
-          val localIndex = packedPartition.indexes.filter(_.isInstanceOf[LocalTrieIndex])
-            .head.asInstanceOf[LocalTrieIndex]
-
-          if (trajectoryIter.isEmpty) {
-            Array.empty[Double].iterator
-          } else {
-            val queryTrajectories = trajectoryIter.toArray
-            var finalCandidates =
-              Random.shuffle(packedPartition.data.asInstanceOf[Array[Trajectory]].toList)
-                .take(DITAConfigConstants.KNN_COEFFICIENT * count).toArray
-                .map((queryTrajectories(Random.nextInt(queryTrajectories.length)), _, DITAConfigConstants.THRESHOLD_LIMIT))
-
-            var threshold: Double = finalThreshold
-            var iteration = 1
-            var canExit = false
-            while (!canExit) {
-              threshold = threshold / 2.0
-              val candidates = queryTrajectories.flatMap(query =>
-                localIndex.getCandidatesWithDistances(query, threshold).map(x => (x._1, query, x._2)))
-              if (candidates.length >= DITAConfigConstants.KNN_COEFFICIENT * count) {
-                finalCandidates = candidates
-              }
-              if (candidates.length < DITAConfigConstants.KNN_COEFFICIENT * count
-                || iteration > DITAConfigConstants.KNN_MAX_LOCAL_ITERATION) {
-                canExit = true
-              }
-              iteration += 1
-            }
-
-            finalCandidates.sortBy(_._3).take(DITAConfigConstants.KNN_COEFFICIENT * count)
-              .map(x => distanceFunction.evalWithTrajectory(x._1, x._2, finalThreshold))
-              .sorted.take(count).iterator
-          }
+          getThresholdLocal(partitionIter, trajectoryIter, distanceFunction, count, finalThreshold)
         }.collect().sorted.take(count)
         if (allThresholds.nonEmpty) {
-          finalThreshold= math.min(finalThreshold, allThresholds.last)
+          finalThreshold = math.min(finalThreshold, allThresholds.last)
         }
         sampleRate *= 10
       }
