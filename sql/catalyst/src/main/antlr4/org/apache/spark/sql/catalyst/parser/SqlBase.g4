@@ -583,7 +583,17 @@ primaryExpression
     ;
 
 trajectorySimilarityExpression
-    : function=trajectorySimilarityFunction '(' left=primaryExpression ',' right=primaryExpression ')'  #trajectorySimilarity
+    : function=trajectorySimilarityFunction '(' leftTable=primaryExpression ',' rightTable=primaryExpression ')'
+    | function=trajectorySimilarityFunction '(' leftTrajectory=trajectoryExpression ',' rightTable=primaryExpression ')'
+    | function=trajectorySimilarityFunction '(' leftTable=primaryExpression ',' rightTrajectory=trajectoryExpression ')'
+    ;
+
+pointExpression
+    : POINT '(' coords+=number (',' coords+=number)* ')'
+    ;
+
+trajectoryExpression
+    : TRAJECTORY '(' points+=pointExpression (',' points+=pointExpression)* ')'
     ;
 
 constant
@@ -976,17 +986,15 @@ INPATH: 'INPATH';
 CURRENT_DATE: 'CURRENT_DATE';
 CURRENT_TIMESTAMP: 'CURRENT_TIMESTAMP';
 
-// Trajectory Similarity Functions
+// DITA Keywords
 DTW: 'DTW';
 FRECHET: 'FRECHET';
 EDR: 'EDR';
 LCSS: 'LCSS';
-
-// Trie Index
 TRIE: 'TRIE';
-
-// KNN
 KNN: 'KNN';
+TRAJECTORY: 'TRAJECTORY';
+POINT: 'POINT';
 
 STRING
     : '\'' ( ~('\''|'\\') | ('\\' .) )* '\''

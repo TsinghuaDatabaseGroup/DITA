@@ -14,7 +14,7 @@
  *  limitations under the License.
  */
 
-package org.apache.spark.sql.execution.dita.exec
+package org.apache.spark.sql.execution.dita.algorithms
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.{PartitionPruningRDD, RDD}
@@ -31,7 +31,7 @@ import org.apache.spark.{Accumulable, SparkContext}
 import scala.collection.mutable.{HashMap, HashSet}
 import scala.util.control.Breaks
 
-object TrajectorySimilarityWithThresholdJoinAlgorithms {
+object TrajectorySimilarityWithThresholdAlgorithms {
 
   object LocalJoin {
     def join(partitionIter: Iterator[PackedPartition],
@@ -53,6 +53,21 @@ object TrajectorySimilarityWithThresholdJoinAlgorithms {
       })
 
       answerPairs.iterator
+    }
+  }
+
+  object DistributedSearch {
+    def search(sparkContext: SparkContext, query: Trajectory, trieRDD: TrieRDD,
+               distanceFunction: TrajectorySimilarity,
+               threshold: Double): RDD[(Trajectory, Double)] = {
+      val bQuery = sparkContext.broadcast(query)
+      val globalTrieIndex = trieRDD.globalIndex.asInstanceOf[GlobalTrieIndex]
+
+      val candidatePartitions = globalTrieIndex.getPartitions(query, threshold)
+      PartitionPruningRDD.create(trieRDD.packedRDD, candidatePartitions.contains)
+        .mapPartitions(iter =>
+          LocalJoin.join(iter, Iterator(bQuery.value), distanceFunction, threshold)
+            .map(x => (x._2, x._3)))
     }
   }
 

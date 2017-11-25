@@ -14,7 +14,7 @@
  *  limitations under the License.
  */
 
-package org.apache.spark.sql.execution.dita.exec
+package org.apache.spark.sql.execution.dita.algorithms
 
 import org.apache.spark.SparkContext
 import org.apache.spark.internal.Logging
@@ -28,7 +28,7 @@ import org.apache.spark.sql.execution.dita.rdd.TrieRDD
 
 import scala.util.Random
 
-object TrajectorySimilarityWithKNNJoinAlgorithms {
+object TrajectorySimilarityWithKNNAlgorithms {
 
   object DistributedJoin extends Logging {
     def join(sparkContext: SparkContext, leftTrieRDD: TrieRDD, rightTrieRDD: TrieRDD,
@@ -36,7 +36,7 @@ object TrajectorySimilarityWithKNNJoinAlgorithms {
              count: Int): RDD[(Trajectory, Trajectory, Double)] = {
       val threshold = getThreshold(sparkContext, leftTrieRDD, rightTrieRDD, distanceFunction, count)
       logWarning(s"Threshold: $threshold")
-      val answerRDD = TrajectorySimilarityWithThresholdJoinAlgorithms.SimpleDistributedJoin
+      val answerRDD = TrajectorySimilarityWithThresholdAlgorithms.SimpleDistributedJoin
         .join(sparkContext, leftTrieRDD, rightTrieRDD, distanceFunction, threshold)
       logWarning(s"Answer Count: ${answerRDD.count()}")
       sparkContext.parallelize(answerRDD.takeOrdered(count))

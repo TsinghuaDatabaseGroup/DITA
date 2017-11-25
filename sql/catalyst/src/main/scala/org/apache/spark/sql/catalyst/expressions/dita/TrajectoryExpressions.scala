@@ -22,7 +22,7 @@ import org.apache.spark.sql.catalyst.expressions.{BinaryExpression, Expression, 
 import org.apache.spark.sql.catalyst.expressions.codegen.CodegenFallback
 import org.apache.spark.sql.catalyst.expressions.dita.common.shape.Point
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.{Trajectory, TrajectorySimilarity}
-import org.apache.spark.sql.types.{ArrayType, BooleanType, DataType, DoubleType}
+import org.apache.spark.sql.types.{BooleanType, DataType, DoubleType}
 
 case class TrajectorySimilarityExpression(function: TrajectorySimilarityFunction,
                                           traj1: Expression, traj2: Expression)
@@ -35,10 +35,14 @@ case class TrajectorySimilarityExpression(function: TrajectorySimilarityFunction
 
   override def nullSafeEval(traj1: Any, traj2: Any): Any = function match {
     case TrajectorySimilarityFunction.DTW =>
-      val trajectory1 = TrajectorySimilarityExpression.getTrajectory(
-        traj1.asInstanceOf[UnsafeArrayData])
-      val trajectory2 = TrajectorySimilarityExpression.getTrajectory(
-        traj2.asInstanceOf[UnsafeArrayData])
+      val trajectory1 = traj1 match {
+        case t: Trajectory => t
+        case uad: UnsafeArrayData => TrajectorySimilarityExpression.getTrajectory(uad)
+      }
+      val trajectory2 = traj2 match {
+        case t: Trajectory => t
+        case uad: UnsafeArrayData => TrajectorySimilarityExpression.getTrajectory(uad)
+      }
       TrajectorySimilarity.DTWDistance.evalWithTrajectory(trajectory1, trajectory2)
   }
 }

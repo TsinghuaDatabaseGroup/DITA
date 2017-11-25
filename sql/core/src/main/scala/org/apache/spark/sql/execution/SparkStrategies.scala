@@ -22,8 +22,8 @@ import org.apache.spark.sql.Strategy
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.encoders.RowEncoder
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.expressions.aggregate.First
-import org.apache.spark.sql.catalyst.expressions.dita.index.IndexedRelation
+import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.Trajectory
+import org.apache.spark.sql.catalyst.expressions.dita.{TrajectorySimilarityWithKNNExpression, TrajectorySimilarityWithThresholdExpression}
 import org.apache.spark.sql.catalyst.planning._
 import org.apache.spark.sql.catalyst.plans._
 import org.apache.spark.sql.catalyst.plans.logical._
@@ -31,7 +31,8 @@ import org.apache.spark.sql.catalyst.plans.physical._
 import org.apache.spark.sql.execution
 import org.apache.spark.sql.execution.columnar.{InMemoryRelation, InMemoryTableScanExec}
 import org.apache.spark.sql.execution.command._
-import org.apache.spark.sql.execution.dita.exec.{TrajectorySimilarityWithKNNJoinExec, TrajectorySimilarityWithThresholdJoinExec}
+import org.apache.spark.sql.execution.dita.exec.join.{TrajectorySimilarityWithKNNJoinExec, TrajectorySimilarityWithThresholdJoinExec}
+import org.apache.spark.sql.execution.dita.exec.search.TrajectorySimilarityWithThresholdSearchExec
 import org.apache.spark.sql.execution.dita.sql.{ExtractTrajectorySimilarityWithKNNJoin, ExtractTrajectorySimilarityWithThresholdJoin}
 import org.apache.spark.sql.execution.exchange.ShuffleExchange
 import org.apache.spark.sql.execution.joins.{BuildLeft, BuildRight}
@@ -317,6 +318,37 @@ abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
           filters,
           identity[Seq[Expression]], // All filters still need to be evaluated.
           InMemoryTableScanExec(_, filters, mem)) :: Nil
+      case _ => Nil
+    }
+  }
+
+  object TrajectoryScans extends Strategy {
+
+    def apply(plan: LogicalPlan): Seq[SparkPlan] = plan match {
+      case PhysicalOperation(projectList, filters, relation)
+        if filters.exists(e => e.isInstanceOf[TrajectorySimilarityWithThresholdExpression]) =>
+        val expressionWithThreshold = filters.find(e =>
+          e.isInstanceOf[TrajectorySimilarityWithThresholdExpression]).get
+          .asInstanceOf[TrajectorySimilarityWithThresholdExpression]
+        val threshold = expressionWithThreshold.threshold
+        val expression = expressionWithThreshold.similarity
+        val function = expression.function
+        val (leftQuery, rightKey) = expression.traj1 match {
+          case Literal(v, _) => (v.asInstanceOf[Trajectory], expression.traj2)
+          case _ => (expression.traj2.asInstanceOf[Literal].value.asInstanceOf[Trajectory],
+            expression.traj1)
+        }
+        val exec = TrajectorySimilarityWithThresholdSearchExec(leftQuery,
+          rightKey, function, threshold, relation, planLater(relation))
+
+        pruneFilterProject(
+          projectList,
+          filters,
+          fs => fs.filter(f => !f.isInstanceOf[TrajectorySimilarityWithThresholdExpression]),
+          _ => exec) :: Nil
+      case PhysicalOperation(projectList, filters, relation)
+        if filters.exists(e => e.isInstanceOf[TrajectorySimilarityWithKNNExpression]) =>
+        Nil
       case _ => Nil
     }
   }

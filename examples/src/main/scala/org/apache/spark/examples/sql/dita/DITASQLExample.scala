@@ -39,12 +39,12 @@ object DITASQLExample {
     // For implicit conversions like converting RDDs to DataFrames
     import spark.implicits._
 
-    val df = spark.sparkContext
+    val trajs = spark.sparkContext
       .textFile("examples/src/main/resources/trajectory_small.txt")
       .zipWithIndex().map(getTrajectory)
       .filter(_.traj.length >= DITAConfigConstants.TRAJECTORY_MIN_LENGTH)
       .filter(_.traj.length <= DITAConfigConstants.TRAJECTORY_MAX_LENGTH)
-      .toDF()
+    val df = trajs.toDF()
     df.createOrReplaceTempView("traj1")
     df.createOrReplaceTempView("traj2")
 
@@ -65,6 +65,13 @@ object DITASQLExample {
     spark.sql("CREATE TRIE INDEX traj1_index ON traj1 (traj)")
     end = System.currentTimeMillis()
     println(s"Building Index time: ${end - start} ms")
+
+    start = System.currentTimeMillis()
+    var queryTrajStr = trajs.take(1).head.traj.map(point => s"POINT(${point.mkString(",")})").mkString(",")
+    queryTrajStr = s"TRAJECTORY($queryTrajStr)"
+    spark.sql(s"SELECT COUNT(*) FROM traj1 WHERE DTW(traj1.traj, $queryTrajStr) <= 0.005").show()
+    end = System.currentTimeMillis()
+    println(s"Threshold Join Running time: ${end - start} ms")
 
     start = System.currentTimeMillis()
     spark.sql("SELECT COUNT(*) FROM traj1 JOIN traj2 ON DTW(traj1.traj, traj2.traj) <= 0.005")

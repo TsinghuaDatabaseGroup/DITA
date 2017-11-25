@@ -14,7 +14,7 @@
  *  limitations under the License.
  */
 
-package org.apache.spark.sql.execution.dita.exec
+package org.apache.spark.sql.execution.dita.exec.join
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
@@ -25,16 +25,18 @@ import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.{Traject
 import org.apache.spark.sql.catalyst.expressions.dita.{TrajectorySimilarityExpression, TrajectorySimilarityFunction}
 import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Expression, UnsafeArrayData, UnsafeRow}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
+import org.apache.spark.sql.execution.dita.algorithms.TrajectorySimilarityWithThresholdAlgorithms
+import org.apache.spark.sql.execution.dita.exec.TrajectoryExecUtils
 import org.apache.spark.sql.execution.dita.rdd.TrieRDD
 import org.apache.spark.sql.execution.dita.sql.{DITAIternalRow, TrieIndexedRelation}
 import org.apache.spark.sql.execution.{BinaryExecNode, SparkPlan}
 
 
-case class TrajectorySimilarityWithKNNJoinExec(leftKey: Expression, rightKey: Expression,
-                                               function: TrajectorySimilarityFunction,
-                                               count: Int,
-                                               leftLogicalPlan: LogicalPlan, rightLogicalPlan: LogicalPlan,
-                                               left: SparkPlan, right: SparkPlan) extends BinaryExecNode with Logging {
+case class TrajectorySimilarityWithThresholdJoinExec(leftKey: Expression, rightKey: Expression,
+                                                     function: TrajectorySimilarityFunction,
+                                                     threshold: Double,
+                                                     leftLogicalPlan: LogicalPlan, rightLogicalPlan: LogicalPlan,
+                                                     left: SparkPlan, right: SparkPlan) extends BinaryExecNode with Logging {
   override def output: Seq[Attribute] = left.output ++ right.output
 
   sparkContext.conf.registerKryoClasses(Array(classOf[Shape], classOf[Point],
@@ -42,7 +44,8 @@ case class TrajectorySimilarityWithKNNJoinExec(leftKey: Expression, rightKey: Ex
 
   protected override def doExecute(): RDD[InternalRow] = {
     logWarning(s"Distance function: $function")
-    logWarning(s"Count: $count")
+    logWarning(s"Threshold: $threshold")
+    val distanceFunction = TrajectorySimilarity.getDistanceFunction(function)
 
     val leftResults = left.execute()
     val rightResults = right.execute()
@@ -52,36 +55,16 @@ case class TrajectorySimilarityWithKNNJoinExec(leftKey: Expression, rightKey: Ex
 
     logWarning("Applying efficient trajectory similarity join algorithm!")
 
-    val distanceFunction = TrajectorySimilarity.getDistanceFunction(function)
-
-    val leftTrieRDD = TrajectorySimilarityWithThresholdJoinExec
-      .getIndexedRelation(sqlContext, leftLogicalPlan)
-      .map(_.asInstanceOf[TrieIndexedRelation].trieRDD)
-      .getOrElse({
-        logWarning("Building left trie RDD")
-        val leftRDD = leftResults.asInstanceOf[RDD[UnsafeRow]].map(row =>
-          new DITAIternalRow(row, TrajectorySimilarityExpression.getPoints(
-            BindReferences.bindReference(leftKey, left.output)
-              .eval(row).asInstanceOf[UnsafeArrayData]))).asInstanceOf[RDD[Trajectory]]
-        new TrieRDD(leftRDD)
-      })
-
-    val rightTrieRDD = TrajectorySimilarityWithThresholdJoinExec
-      .getIndexedRelation(sqlContext, rightLogicalPlan)
-      .map(_.asInstanceOf[TrieIndexedRelation].trieRDD)
-      .getOrElse({
-        logWarning("Building right trie RDD")
-        val rightRDD = rightResults.asInstanceOf[RDD[UnsafeRow]].map(row =>
-          new DITAIternalRow(row, TrajectorySimilarityExpression.getPoints(
-            BindReferences.bindReference(rightKey, right.output)
-              .eval(row).asInstanceOf[UnsafeArrayData]))).asInstanceOf[RDD[Trajectory]]
-        new TrieRDD(rightRDD)
-      })
+    val leftTrieRDD = TrajectoryExecUtils.getTrieRDD(sqlContext, leftResults,
+      leftKey, leftLogicalPlan, left)
+    val rightTrieRDD = TrajectoryExecUtils.getTrieRDD(sqlContext, rightResults,
+      rightKey, rightLogicalPlan, right)
 
     // get answer
-    val join = TrajectorySimilarityWithKNNJoinAlgorithms.DistributedJoin
+    // val join = TrajectorySimilarityWithThresholdJoinAlgorithms.SimpleDistributedJoin
+    val join = TrajectorySimilarityWithThresholdAlgorithms.FineGrainedDistributedJoin
     val answerRDD = join.join(sparkContext, leftTrieRDD, rightTrieRDD,
-      distanceFunction, count)
+      distanceFunction, threshold)
     val outputRDD = answerRDD.mapPartitions { iter =>
       val joiner = GenerateUnsafeRowJoiner.create(left.schema, right.schema)
       iter.map(x =>
@@ -91,4 +74,3 @@ case class TrajectorySimilarityWithKNNJoinExec(leftKey: Expression, rightKey: Ex
     outputRDD.asInstanceOf[RDD[InternalRow]]
   }
 }
-

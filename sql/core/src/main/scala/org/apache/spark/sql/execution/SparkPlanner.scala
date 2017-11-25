@@ -41,6 +41,7 @@ class SparkPlanner(
       Aggregation ::
       JoinSelection ::
       InMemoryScans ::
+      TrajectoryScans ::
       BasicOperators :: Nil)
 
   /**

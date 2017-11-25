@@ -29,9 +29,11 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.sql.AnalysisException
 import org.apache.spark.sql.catalyst.{FunctionIdentifier, TableIdentifier}
 import org.apache.spark.sql.catalyst.analysis._
-import org.apache.spark.sql.catalyst.expressions.{dita, _}
+import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate.{First, Last}
-import org.apache.spark.sql.catalyst.expressions.dita.{TrajectorySimilarityExpression, TrajectorySimilarityFunction, TrajectorySimilarityWithKNNExpression, TrajectorySimilarityWithThresholdExpression}
+import org.apache.spark.sql.catalyst.expressions.dita._
+import org.apache.spark.sql.catalyst.expressions.dita.common.shape.Point
+import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.Trajectory
 import org.apache.spark.sql.catalyst.parser.SqlBaseParser._
 import org.apache.spark.sql.catalyst.plans._
 import org.apache.spark.sql.catalyst.plans.logical._
@@ -1095,40 +1097,67 @@ class AstBuilder(conf: SQLConf) extends SqlBaseBaseVisitor[AnyRef] with Logging 
     }
   }
 
+  /*
+   * Create a point
+   */
+  override def visitPointExpression(ctx: SqlBaseParser.PointExpressionContext):
+  Literal = withOrigin(ctx) {
+    Literal(Point(ctx.coords.asScala.map(_.getText.toDouble).toArray), null)
+  }
+
+  /*
+   * Create a trajectory
+   */
+  override def visitTrajectoryExpression(ctx: TrajectoryExpressionContext):
+  Literal = withOrigin(ctx) {
+    Literal(
+      Trajectory(ctx.points.asScala.map(x => visitPointExpression(x).value.asInstanceOf[Point]).toArray), null)
+  }
+
   /**
     * Create a trajectory similarity expression
     */
-  override def visitTrajectorySimilarity
-    (ctx: TrajectorySimilarityContext): TrajectorySimilarityExpression = withOrigin(ctx) {
+  override def visitTrajectorySimilarityExpression
+    (ctx: TrajectorySimilarityExpressionContext): TrajectorySimilarityExpression = withOrigin(ctx) {
+    val left = if (ctx.leftTable != null) {
+      expression(ctx.leftTable)
+    } else {
+      visitTrajectoryExpression(ctx.leftTrajectory)
+    }
+    val right = if (ctx.rightTable != null) {
+      expression(ctx.rightTable)
+    } else {
+      visitTrajectoryExpression(ctx.rightTrajectory)
+    }
     ctx.function match {
       case function if function.DTW != null => TrajectorySimilarityExpression(
-        TrajectorySimilarityFunction.DTW, expression(ctx.left), expression(ctx.right))
+        TrajectorySimilarityFunction.DTW, left, right)
       case function if function.FRECHET() != null => TrajectorySimilarityExpression(
-        TrajectorySimilarityFunction.FRECHET, expression(ctx.left), expression(ctx.right))
+        TrajectorySimilarityFunction.FRECHET, left, right)
       case function if function.LCSS() != null => TrajectorySimilarityExpression(
-        TrajectorySimilarityFunction.LCSS, expression(ctx.left), expression(ctx.right))
+        TrajectorySimilarityFunction.LCSS, left, right)
       case function if function.EDR() != null => TrajectorySimilarityExpression(
-        TrajectorySimilarityFunction.FRECHET, expression(ctx.left), expression(ctx.right))
+        TrajectorySimilarityFunction.FRECHET, left, right)
     }
   }
 
   /**
     * Create a trajectory similarity with threshold expression
     */
-  override def visitTrajectorySimilarityWithThreshold
-  (ctx: TrajectorySimilarityWithThresholdContext): TrajectorySimilarityWithThresholdExpression = withOrigin(ctx) {
+  override def visitTrajectorySimilarityWithThreshold(ctx: TrajectorySimilarityWithThresholdContext):
+  TrajectorySimilarityWithThresholdExpression = withOrigin(ctx) {
     TrajectorySimilarityWithThresholdExpression(
-      visitTrajectorySimilarity(ctx.trajectorySimilarityExpression().asInstanceOf[TrajectorySimilarityContext]),
+      visitTrajectorySimilarityExpression(ctx.trajectorySimilarityExpression()),
       ctx.threshold.getText.toDouble)
   }
 
   /**
     * Create a trajectory similarity with knn expression
     */
-  override def visitTrajectorySimilarityWithKNN
-  (ctx: TrajectorySimilarityWithKNNContext): TrajectorySimilarityWithKNNExpression = withOrigin(ctx) {
+  override def visitTrajectorySimilarityWithKNN(ctx: TrajectorySimilarityWithKNNContext):
+  TrajectorySimilarityWithKNNExpression = withOrigin(ctx) {
     TrajectorySimilarityWithKNNExpression(
-      visitTrajectorySimilarity(ctx.trajectorySimilarityExpression().asInstanceOf[TrajectorySimilarityContext]),
+      visitTrajectorySimilarityExpression(ctx.trajectorySimilarityExpression()),
       ctx.count.getText.toInt)
   }
 
