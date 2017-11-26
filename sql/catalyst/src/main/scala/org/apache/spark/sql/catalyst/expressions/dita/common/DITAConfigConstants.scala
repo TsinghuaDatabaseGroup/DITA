@@ -16,8 +16,7 @@
 
 package org.apache.spark.sql.catalyst.expressions.dita.common
 
-import org.apache.spark.sql.catalyst.expressions.dita.common.shape.{Point, Rectangle, Shape}
-import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.{Trajectory, TrajectorySimilarity}
+import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.TrajectorySimilarity
 
 object DITAConfigConstants {
   // basic

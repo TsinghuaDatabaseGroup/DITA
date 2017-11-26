@@ -16,9 +16,10 @@
 
 package org.apache.spark.sql.execution.dita.partition.global
 
-import scala.reflect.ClassTag
-import org.apache.spark.{Partition, Partitioner}
 import org.apache.spark.rdd.{RDD, ShuffledRDD}
+import org.apache.spark.{Partition, Partitioner}
+
+import scala.reflect.ClassTag
 
 class ExactKeyPartitioner(expectedNumPartitions: Int) extends Partitioner {
   def numPartitions: Int = expectedNumPartitions

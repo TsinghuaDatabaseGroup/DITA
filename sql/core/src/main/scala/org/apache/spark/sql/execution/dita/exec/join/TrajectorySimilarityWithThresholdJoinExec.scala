@@ -20,15 +20,14 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.codegen.GenerateUnsafeRowJoiner
+import org.apache.spark.sql.catalyst.expressions.dita.TrajectorySimilarityFunction
 import org.apache.spark.sql.catalyst.expressions.dita.common.shape.{Point, Rectangle, Shape}
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.{Trajectory, TrajectorySimilarity}
-import org.apache.spark.sql.catalyst.expressions.dita.{TrajectorySimilarityExpression, TrajectorySimilarityFunction}
-import org.apache.spark.sql.catalyst.expressions.{Attribute, BindReferences, Expression, UnsafeArrayData, UnsafeRow}
+import org.apache.spark.sql.catalyst.expressions.{Attribute, Expression}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.execution.dita.algorithms.TrajectorySimilarityWithThresholdAlgorithms
 import org.apache.spark.sql.execution.dita.exec.TrajectoryExecUtils
-import org.apache.spark.sql.execution.dita.rdd.TrieRDD
-import org.apache.spark.sql.execution.dita.sql.{DITAIternalRow, TrieIndexedRelation}
+import org.apache.spark.sql.execution.dita.sql.DITAIternalRow
 import org.apache.spark.sql.execution.{BinaryExecNode, SparkPlan}
 
 

@@ -16,9 +16,10 @@
 
 package org.apache.spark.sql.catalyst.expressions.dita.common.trajectory
 
-import scala.collection.mutable.ArrayBuffer
 import org.apache.spark.sql.catalyst.expressions.dita.common.DITAConfigConstants
 import org.apache.spark.sql.catalyst.expressions.dita.common.shape.{Point, Rectangle}
+
+import scala.collection.mutable.ArrayBuffer
 
 case class Trajectory(points: Array[Point]) {
   require(points.nonEmpty)

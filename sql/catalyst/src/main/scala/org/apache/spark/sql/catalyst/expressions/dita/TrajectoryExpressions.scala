@@ -18,11 +18,11 @@ package org.apache.spark.sql.catalyst.expressions.dita
 
 import java.util.Locale
 
-import org.apache.spark.sql.catalyst.expressions.{BinaryExpression, Expression, Literal, TernaryExpression, UnaryExpression, UnsafeArrayData}
 import org.apache.spark.sql.catalyst.expressions.codegen.CodegenFallback
 import org.apache.spark.sql.catalyst.expressions.dita.common.shape.{Point, Rectangle}
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.{Trajectory, TrajectorySimilarity}
-import org.apache.spark.sql.types.{BooleanType, DataType, DataTypes, DoubleType}
+import org.apache.spark.sql.catalyst.expressions.{BinaryExpression, Expression, UnaryExpression, UnsafeArrayData}
+import org.apache.spark.sql.types.{BooleanType, DataType, DoubleType}
 
 case class TrajectorySimilarityExpression(function: TrajectorySimilarityFunction,
                                           traj1: Expression, traj2: Expression)

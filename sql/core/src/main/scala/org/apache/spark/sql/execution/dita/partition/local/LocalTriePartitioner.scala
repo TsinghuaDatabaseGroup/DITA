@@ -20,7 +20,6 @@ import org.apache.spark.sql.catalyst.expressions.dita.common.DITAConfigConstants
 import org.apache.spark.sql.catalyst.expressions.dita.common.shape.Point
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.Trajectory
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.TrajectorySimilarity.{DTWDistance, EDRDistance, FrechetDistance, LCSSDistance}
-import org.apache.spark.sql.execution.dita.partition.global.GlobalTriePartitioner
 import org.apache.spark.sql.execution.dita.partition.{STRPartitioner, TriePartitioner}
 
 case class LocalTriePartitioner(partitioner: STRPartitioner,

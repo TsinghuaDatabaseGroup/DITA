@@ -16,9 +16,10 @@
 
 package org.apache.spark.sql.execution.dita.index.local
 
-import scala.collection.mutable
 import org.apache.spark.sql.catalyst.expressions.dita.common.shape.{Point, Rectangle, Shape}
 import org.apache.spark.sql.catalyst.expressions.dita.index.LocalIndex
+
+import scala.collection.mutable
 
 // Reference: https://github.com/InitialDLab/Simba/blob/master/src/main/scala/org/apache/spark/sql/simba/index/RTree.scala
 

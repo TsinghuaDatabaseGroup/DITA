@@ -17,9 +17,9 @@
 package org.apache.spark.sql.execution.dita.sql
 
 import org.apache.spark.sql.catalyst.expressions.Attribute
-import org.apache.spark.sql.{Row, SparkSession}
 import org.apache.spark.sql.execution.command.RunnableCommand
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
+import org.apache.spark.sql.{Row, SparkSession}
 
 case class ShowTrieIndexesCommand() extends RunnableCommand {
 

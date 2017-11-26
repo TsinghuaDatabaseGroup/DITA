@@ -17,8 +17,8 @@
 package org.apache.spark.sql.execution.dita.sql
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.catalyst.expressions.dita.{TrajectorySimilarityExpression, TrajectorySimilarityFunction, TrajectorySimilarityWithKNNExpression, TrajectorySimilarityWithThresholdExpression}
-import org.apache.spark.sql.catalyst.expressions.{Expression, LessThanOrEqual, Literal, PredicateHelper}
+import org.apache.spark.sql.catalyst.expressions.dita.{TrajectorySimilarityFunction, TrajectorySimilarityWithKNNExpression, TrajectorySimilarityWithThresholdExpression}
+import org.apache.spark.sql.catalyst.expressions.{Expression, PredicateHelper}
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.plans.{JoinType, logical}
 

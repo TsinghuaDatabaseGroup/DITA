@@ -17,10 +17,10 @@
 package org.apache.spark.sql.execution.dita.sql
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.{AnalysisException, Row, SparkSession}
 import org.apache.spark.sql.catalyst.TableIdentifier
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, Project}
 import org.apache.spark.sql.execution.command.RunnableCommand
+import org.apache.spark.sql.{AnalysisException, Row, SparkSession}
 
 case class CreateTrieIndexCommand(tableName: TableIdentifier, column: String, indexName: String)
   extends RunnableCommand {

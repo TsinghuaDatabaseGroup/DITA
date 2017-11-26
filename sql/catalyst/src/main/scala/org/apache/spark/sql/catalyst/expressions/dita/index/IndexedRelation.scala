@@ -17,8 +17,8 @@
 package org.apache.spark.sql.catalyst.expressions.dita.index
 
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.catalyst.expressions.dita.PackedPartition
 import org.apache.spark.sql.catalyst.expressions.Attribute
+import org.apache.spark.sql.catalyst.expressions.dita.PackedPartition
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 
 abstract class IndexedRelation extends LogicalPlan {

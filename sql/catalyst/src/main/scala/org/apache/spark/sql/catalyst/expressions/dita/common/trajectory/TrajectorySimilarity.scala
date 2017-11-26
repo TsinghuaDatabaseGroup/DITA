@@ -17,11 +17,10 @@
 package org.apache.spark.sql.catalyst.expressions.dita.common.trajectory
 
 import org.apache.spark.sql.catalyst.expressions.dita.TrajectorySimilarityFunction
-
-import scala.reflect.ClassTag
 import org.apache.spark.sql.catalyst.expressions.dita.common.DITAConfigConstants
 import org.apache.spark.sql.catalyst.expressions.dita.common.shape.{Point, Rectangle, Shape}
-import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.TrajectorySimilarity.DTWDistance.{cellEstimation, getDistanceVector}
+
+import scala.reflect.ClassTag
 
 object PointDistance {
   def eval(v: Point): Double = {
