@@ -37,8 +37,9 @@ import org.apache.spark.sql.catalyst.catalog.CatalogRelation
 import org.apache.spark.sql.catalyst.encoders._
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate._
+import org.apache.spark.sql.catalyst.expressions.dita.common.shape.{Point, Rectangle, Shape}
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.Trajectory
-import org.apache.spark.sql.catalyst.expressions.dita.{TrajectorySimilarityExpression, TrajectorySimilarityFunction, TrajectorySimilarityWithKNNExpression, TrajectorySimilarityWithThresholdExpression}
+import org.apache.spark.sql.catalyst.expressions.dita._
 import org.apache.spark.sql.catalyst.json.{JSONOptions, JacksonGenerator}
 import org.apache.spark.sql.catalyst.optimizer.CombineUnions
 import org.apache.spark.sql.catalyst.parser.ParseException
@@ -944,6 +945,22 @@ class Dataset[T] private[sql](
     val trajectorySimilarityExpression = TrajectorySimilarityExpression(function, leftKey.expr, rightKey.expr)
     val condition = TrajectorySimilarityWithKNNExpression(trajectorySimilarityExpression, count)
     Join(logicalPlan, right.logicalPlan, joinType = Inner, Some(condition))
+  }
+
+  /*
+   * Trajectory mbr range search
+   */
+  def trajectoryMBRRangeSearch(mbr: Rectangle, key: Column): DataFrame = withPlan {
+    val condition = TrajectoryMBRRangeExpression(key.expr, mbr)
+    Filter(condition, logicalPlan)
+  }
+
+  /*
+   * Trajectory circle range search
+   */
+  def trajectoryCircleRangeSearch(center: Point, radius: Double, key: Column): DataFrame = withPlan {
+    val condition = TrajectoryCircleRangeExpression(key.expr, center, radius)
+    Filter(condition, logicalPlan)
   }
 
   /**

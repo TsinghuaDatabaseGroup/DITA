@@ -19,7 +19,7 @@ package org.apache.spark.examples.sql.dita
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.expressions.dita.TrajectorySimilarityFunction
 import org.apache.spark.sql.catalyst.expressions.dita.common.DITAConfigConstants
-import org.apache.spark.sql.catalyst.expressions.dita.common.shape.Point
+import org.apache.spark.sql.catalyst.expressions.dita.common.shape.{Point, Rectangle}
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.Trajectory
 
 object DITADataFrameExample {
@@ -71,6 +71,16 @@ object DITADataFrameExample {
 
     df1.trajectorySimilarityWithKNNJoin(df2, df1("traj"), df2("traj"),
       TrajectorySimilarityFunction.DTW, 100).show()
+
+    df1.trajectorySimilarityWithKNNJoin(df2, df1("traj"), df2("traj"),
+      TrajectorySimilarityFunction.DTW, 100).show()
+
+    val mbr = Rectangle(Point(Array(39.8, 116.2)), Point(Array(40.0, 116.4)))
+    df1.trajectoryMBRRangeSearch(mbr, df1("traj")).show()
+
+    val center = Point(Array(39.9, 116.3))
+    val radius = 0.1
+    df1.trajectoryCircleRangeSearch(center, radius, df1("traj")).show()
 
     spark.stop()
   }
