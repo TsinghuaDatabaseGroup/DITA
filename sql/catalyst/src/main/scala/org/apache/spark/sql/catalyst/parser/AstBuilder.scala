@@ -32,7 +32,7 @@ import org.apache.spark.sql.catalyst.analysis._
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.aggregate.{First, Last}
 import org.apache.spark.sql.catalyst.expressions.dita._
-import org.apache.spark.sql.catalyst.expressions.dita.common.shape.Point
+import org.apache.spark.sql.catalyst.expressions.dita.common.shape.{Point, Rectangle}
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.Trajectory
 import org.apache.spark.sql.catalyst.parser.SqlBaseParser._
 import org.apache.spark.sql.catalyst.plans._
@@ -1161,6 +1161,22 @@ class AstBuilder(conf: SQLConf) extends SqlBaseBaseVisitor[AnyRef] with Logging 
       ctx.count.getText.toInt)
   }
 
+  /**
+    * Create a trajectory range expression
+    */
+  override def visitTrajectoryMBRRange(ctx: TrajectoryMBRRangeContext):
+  TrajectoryMBRRangeExpression = withOrigin(ctx) {
+    val mbr = Rectangle(visitPointExpression(ctx.lowPoint).value.asInstanceOf[Point],
+      visitPointExpression(ctx.highPoint).value.asInstanceOf[Point])
+    TrajectoryMBRRangeExpression(expression(ctx.leftTable), mbr)
+  }
+
+  override def visitTrajectoryCircleRange(ctx:  TrajectoryCircleRangeContext):
+  TrajectoryCircleRangeExpression = withOrigin(ctx) {
+    val center = visitPointExpression(ctx.center).value.asInstanceOf[Point]
+    val radius = ctx.radius.getText.toDouble
+    TrajectoryCircleRangeExpression(expression(ctx.leftTable), center, radius)
+  }
 
   /**
    * Create a function database (optional) and name pair.

@@ -23,7 +23,7 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.encoders.RowEncoder
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.Trajectory
-import org.apache.spark.sql.catalyst.expressions.dita.{TrajectorySimilarityWithKNNExpression, TrajectorySimilarityWithThresholdExpression}
+import org.apache.spark.sql.catalyst.expressions.dita.{TrajectoryCircleRangeExpression, TrajectoryMBRRangeExpression, TrajectorySimilarityWithKNNExpression, TrajectorySimilarityWithThresholdExpression}
 import org.apache.spark.sql.catalyst.planning._
 import org.apache.spark.sql.catalyst.plans._
 import org.apache.spark.sql.catalyst.plans.logical._
@@ -32,7 +32,7 @@ import org.apache.spark.sql.execution
 import org.apache.spark.sql.execution.columnar.{InMemoryRelation, InMemoryTableScanExec}
 import org.apache.spark.sql.execution.command._
 import org.apache.spark.sql.execution.dita.exec.join.{TrajectorySimilarityWithKNNJoinExec, TrajectorySimilarityWithThresholdJoinExec}
-import org.apache.spark.sql.execution.dita.exec.search.{TrajectorySimilarityWithKNNSearchExec, TrajectorySimilarityWithThresholdSearchExec}
+import org.apache.spark.sql.execution.dita.exec.search.{TrajectoryRangeSearchExec, TrajectorySimilarityWithKNNSearchExec, TrajectorySimilarityWithThresholdSearchExec}
 import org.apache.spark.sql.execution.dita.sql.{ExtractTrajectorySimilarityWithKNNJoin, ExtractTrajectorySimilarityWithThresholdJoin}
 import org.apache.spark.sql.execution.exchange.ShuffleExchange
 import org.apache.spark.sql.execution.joins.{BuildLeft, BuildRight}
@@ -346,6 +346,7 @@ abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
           filters,
           fs => fs.filter(f => !f.isInstanceOf[TrajectorySimilarityWithThresholdExpression]),
           _ => exec) :: Nil
+
       case PhysicalOperation(projectList, filters, relation)
         if filters.exists(e => e.isInstanceOf[TrajectorySimilarityWithKNNExpression]) =>
         val expressionWithThreshold = filters.find(e =>
@@ -367,6 +368,41 @@ abstract class SparkStrategies extends QueryPlanner[SparkPlan] {
           filters,
           fs => fs.filter(f => !f.isInstanceOf[TrajectorySimilarityWithKNNExpression]),
           _ => exec) :: Nil
+
+      case PhysicalOperation(projectList, filters, relation)
+        if filters.exists(e => e.isInstanceOf[TrajectoryMBRRangeExpression]) =>
+        val mbrExpression = filters.find(e =>
+          e.isInstanceOf[TrajectoryMBRRangeExpression]).get
+          .asInstanceOf[TrajectoryMBRRangeExpression]
+        val expression = mbrExpression.traj
+        val mbr = mbrExpression.mbr
+
+        val exec = TrajectoryRangeSearchExec(mbr, expression, 0.0, relation, planLater(relation))
+
+        pruneFilterProject(
+          projectList,
+          filters,
+          fs => fs.filter(f => !f.isInstanceOf[TrajectorySimilarityWithKNNExpression]),
+          _ => exec) :: Nil
+
+      case PhysicalOperation(projectList, filters, relation)
+        if filters.exists(e => e.isInstanceOf[TrajectoryCircleRangeExpression]) =>
+        val circleExpression = filters.find(e =>
+          e.isInstanceOf[TrajectoryCircleRangeExpression]).get
+          .asInstanceOf[TrajectoryCircleRangeExpression]
+        val expression = circleExpression.traj
+        val center = circleExpression.center
+        val radius = circleExpression.radius
+
+        val exec = TrajectoryRangeSearchExec(center, expression,
+          radius, relation, planLater(relation))
+
+        pruneFilterProject(
+          projectList,
+          filters,
+          fs => fs.filter(f => !f.isInstanceOf[TrajectorySimilarityWithKNNExpression]),
+          _ => exec) :: Nil
+
       case _ => Nil
     }
   }

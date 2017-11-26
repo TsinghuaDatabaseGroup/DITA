@@ -77,7 +77,7 @@ abstract class STRPartitioner(expectedNumPartitions: Int, dimension: Int,
     if (rTree == null) {
       List.empty
     } else {
-      val k = key.asInstanceOf[Point]
+      val k = key.asInstanceOf[Shape]
       rTree.circleRange(k, threshold)
     }
   }

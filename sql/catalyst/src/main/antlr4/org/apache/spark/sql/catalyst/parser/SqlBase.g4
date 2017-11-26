@@ -551,6 +551,10 @@ trajectorySimilarityFunction
 valueExpression
     : trajectorySimilarityExpression LTE threshold=number                                    #trajectorySimilarityWithThreshold
     | trajectorySimilarityExpression KNN count=number                                        #trajectorySimilarityWithKNN
+    | leftTable=primaryExpression IN MBRRANGE '(' lowPoint=pointExpression
+        ',' highPoint=pointExpression ')'                                                    #trajectoryMBRRange
+    | leftTable=primaryExpression IN CIRCLERANGE '(' center=pointExpression
+        ',' radius=number ')'                                                                #trajectoryCircleRange
     | primaryExpression                                                                      #valueExpressionDefault
     | operator=(MINUS | PLUS | TILDE) valueExpression                                        #arithmeticUnary
     | left=valueExpression operator=(ASTERISK | SLASH | PERCENT | DIV) right=valueExpression #arithmeticBinary
@@ -595,6 +599,7 @@ pointExpression
 trajectoryExpression
     : TRAJECTORY '(' points+=pointExpression (',' points+=pointExpression)* ')'
     ;
+
 
 constant
     : NULL                                                                                     #nullLiteral
@@ -995,6 +1000,8 @@ TRIE: 'TRIE';
 KNN: 'KNN';
 TRAJECTORY: 'TRAJECTORY';
 POINT: 'POINT';
+MBRRANGE: 'MBRRANGE';
+CIRCLERANGE: 'CIRCLERANGE';
 
 STRING
     : '\'' ( ~('\''|'\\') | ('\\' .) )* '\''

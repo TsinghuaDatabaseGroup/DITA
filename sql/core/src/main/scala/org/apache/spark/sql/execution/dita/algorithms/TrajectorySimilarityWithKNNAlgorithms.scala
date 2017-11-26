@@ -82,8 +82,6 @@ object TrajectorySimilarityWithKNNAlgorithms {
     def search(sparkContext: SparkContext, query: Trajectory, trieRDD: TrieRDD,
                distanceFunction: TrajectorySimilarity,
                count: Int): RDD[(Trajectory, Double)] = {
-      val bQuery = sparkContext.broadcast(query)
-
       val threshold = trieRDD.packedRDD.mapPartitions(iter =>
         getThresholdLocal(iter, Iterator(query), distanceFunction, count, Double.MaxValue))
         .collect().sorted.take(count).last
@@ -120,15 +118,15 @@ object TrajectorySimilarityWithKNNAlgorithms {
                              distanceFunction: TrajectorySimilarity,
                              count: Int): Double = {
       // basic variables
-      val globalTreeIndex = leftTrieRDD.globalIndex.asInstanceOf[GlobalTrieIndex]
-      val bGlobalTreeIndex = sparkContext.broadcast(globalTreeIndex)
+      val globalTrieIndex = leftTrieRDD.globalIndex.asInstanceOf[GlobalTrieIndex]
+      val bGlobalTrieIndex = sparkContext.broadcast(globalTrieIndex)
       val leftNumPartitions = leftTrieRDD.packedRDD.partitions.length
 
       // get threshold
       val rightSingleCandidatesRDD = rightTrieRDD.packedRDD.flatMap(packedPartition =>
         packedPartition.getSample(DITAConfigConstants.KNN_MAX_SAMPLING_RATE)
           .asInstanceOf[List[Trajectory]].map(trajectory =>
-          (bGlobalTreeIndex.value.getPartitions(trajectory, 0.0).head, trajectory)
+          (bGlobalTrieIndex.value.getPartitions(trajectory, 0.0).head, trajectory)
         )
       )
       val partitionedRightSingleCandidatesRDD = ExactKeyPartitioner.partition(

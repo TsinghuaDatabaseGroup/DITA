@@ -18,7 +18,7 @@ package org.apache.spark.sql.execution.dita.partition
 
 import org.apache.spark.Partitioner
 import org.apache.spark.sql.catalyst.expressions.dita.common.DITAConfigConstants
-import org.apache.spark.sql.catalyst.expressions.dita.common.shape.Point
+import org.apache.spark.sql.catalyst.expressions.dita.common.shape.{Point, Shape}
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.Trajectory
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.TrajectorySimilarity.{DTWDistance, EDRDistance, FrechetDistance, LCSSDistance}
 
@@ -33,6 +33,17 @@ abstract class TriePartitioner(partitioner: STRPartitioner,
     partitioner.numPartitions
   } else {
     totalPartitions.last
+  }
+
+  def getPartitions(key: Shape, threshold: Double): List[Int] = {
+    val childPartitions = partitioner.getPartitionsWithThreshold(key, threshold)
+    if (childPartitioners.isEmpty) {
+      childPartitions.filter(_._2 != -1).map(_._2)
+    } else {
+      childPartitions.flatMap { case (_, x) =>
+        childPartitioners(x).getPartitions(key, threshold)
+      }
+    }
   }
 
   def getPartitions(key: Any, threshold: Double,

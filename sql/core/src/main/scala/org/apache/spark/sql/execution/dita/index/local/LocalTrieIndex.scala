@@ -16,6 +16,7 @@
 
 package org.apache.spark.sql.execution.dita.index.local
 
+import org.apache.spark.sql.catalyst.expressions.dita.common.shape.Shape
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.Trajectory
 import org.apache.spark.sql.catalyst.expressions.dita.index.LocalIndex
 import org.apache.spark.sql.execution.dita.partition.local.LocalTriePartitioner
@@ -25,15 +26,13 @@ case class LocalTrieIndex(partitioner: LocalTriePartitioner) extends LocalIndex 
     partitioner.getCandidates(key, threshold, 0.0).filter(_._2 <= threshold).map(_._1)
   }
 
-  def getCandidatesWithDistances(key: Trajectory, threshold: Double): List[(Trajectory, Double)] = {
-    partitioner.getCandidates(key, threshold, 0.0)
-  }
-
-  /*
   def getCandidates(key: Shape, threshold: Double): List[Trajectory] = {
     partitioner.getCandidates(key, threshold)
   }
-  */
+
+  def getCandidatesWithDistances(key: Trajectory, threshold: Double): List[(Trajectory, Double)] = {
+    partitioner.getCandidates(key, threshold, 0.0)
+  }
 }
 
 object LocalTrieIndex {

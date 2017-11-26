@@ -18,11 +18,11 @@ package org.apache.spark.sql.catalyst.expressions.dita
 
 import java.util.Locale
 
-import org.apache.spark.sql.catalyst.expressions.{BinaryExpression, Expression, Literal, UnsafeArrayData}
+import org.apache.spark.sql.catalyst.expressions.{BinaryExpression, Expression, Literal, TernaryExpression, UnaryExpression, UnsafeArrayData}
 import org.apache.spark.sql.catalyst.expressions.codegen.CodegenFallback
-import org.apache.spark.sql.catalyst.expressions.dita.common.shape.Point
+import org.apache.spark.sql.catalyst.expressions.dita.common.shape.{Point, Rectangle}
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.{Trajectory, TrajectorySimilarity}
-import org.apache.spark.sql.types.{BooleanType, DataType, DoubleType}
+import org.apache.spark.sql.types.{BooleanType, DataType, DataTypes, DoubleType}
 
 case class TrajectorySimilarityExpression(function: TrajectorySimilarityFunction,
                                           traj1: Expression, traj2: Expression)
@@ -61,28 +61,26 @@ object TrajectorySimilarityExpression {
 
 case class TrajectorySimilarityWithThresholdExpression(similarity: TrajectorySimilarityExpression,
                                                        threshold: Double)
-  extends BinaryExpression with CodegenFallback {
+  extends UnaryExpression with CodegenFallback {
 
-  override def left: Expression = similarity
-  override def right: Expression = Literal(threshold)
+  override def child: Expression = similarity
 
   override def dataType: DataType = BooleanType
 
-  override def nullSafeEval(left: Any, right: Any): Any = {
-    left.asInstanceOf[Double] <= threshold
+  override def nullSafeEval(input: Any): Any = {
+    input.asInstanceOf[Double] <= threshold
   }
 }
 
 case class TrajectorySimilarityWithKNNExpression(similarity: TrajectorySimilarityExpression,
                                                  count: Int)
-  extends BinaryExpression with CodegenFallback {
+  extends UnaryExpression with CodegenFallback {
 
-  override def left: Expression = similarity
-  override def right: Expression = Literal(count)
+  override def child: Expression = similarity
 
   override def dataType: DataType = BooleanType
 
-  override def nullSafeEval(left: Any, right: Any): Any = {
+  override def nullSafeEval(left: Any): Any = {
     throw new NotImplementedError()
   }
 }
@@ -121,4 +119,32 @@ object TrajectorySimilarityFunction {
           "Supported trajectory similarity functions include: "
           + supported.mkString("'", "', '", "'") + ".")
     }
+}
+
+case class TrajectoryMBRRangeExpression(traj: Expression, mbr: Rectangle)
+  extends UnaryExpression with CodegenFallback {
+
+  override def child: Expression = traj
+
+  override def dataType: DataType = BooleanType
+
+  override def nullSafeEval(input: Any): Any = {
+    val trajectory = TrajectorySimilarityExpression.getTrajectory(
+      input.asInstanceOf[UnsafeArrayData])
+    trajectory.points.forall(mbr.contains)
+  }
+}
+
+case class TrajectoryCircleRangeExpression(traj: Expression, center: Point, radius: Double)
+  extends UnaryExpression with CodegenFallback {
+
+  override def child: Expression = traj
+
+  override def dataType: DataType = BooleanType
+
+  override def nullSafeEval(input: Any): Any = {
+    val trajectory = TrajectorySimilarityExpression.getTrajectory(
+      input.asInstanceOf[UnsafeArrayData])
+    trajectory.points.forall(p => p.minDist(center) <= radius)
+  }
 }

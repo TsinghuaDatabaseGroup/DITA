@@ -18,7 +18,9 @@ package org.apache.spark.examples.sql.dita
 
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.expressions.dita.common.DITAConfigConstants
+import org.apache.spark.sql.catalyst.expressions.dita.common.shape.{Point, Rectangle}
 
+// scalastyle:off println
 object DITASQLExample {
 
   case class TrajectoryRecord(id: Long, traj: Array[Array[Double]])
@@ -66,29 +68,53 @@ object DITASQLExample {
     end = System.currentTimeMillis()
     println(s"Building Index time: ${end - start} ms")
 
+    // trajectory similarity search with threshold
     start = System.currentTimeMillis()
-    var queryTrajStr = trajs.take(1).head.traj.map(point => s"POINT(${point.mkString(",")})").mkString(",")
+    var queryTrajStr = trajs.take(1).head.traj
+      .map(point => s"POINT(${point.mkString(",")})").mkString(",")
     queryTrajStr = s"TRAJECTORY($queryTrajStr)"
     spark.sql(s"SELECT COUNT(*) FROM traj1 WHERE DTW(traj1.traj, $queryTrajStr) <= 0.005").show()
     end = System.currentTimeMillis()
     println(s"Threshold Search Running time: ${end - start} ms")
 
+    // trajectory similarity search with knn
     start = System.currentTimeMillis()
     spark.sql(s"SELECT COUNT(*) FROM traj1 WHERE DTW(traj1.traj, $queryTrajStr) KNN 100").show()
     end = System.currentTimeMillis()
     println(s"KNN Search Running time: ${end - start} ms")
 
+    // trajectory similarity join with threshold
     start = System.currentTimeMillis()
     spark.sql("SELECT COUNT(*) FROM traj1 JOIN traj2 ON DTW(traj1.traj, traj2.traj) <= 0.005")
       .show()
     end = System.currentTimeMillis()
     println(s"Threshold Join Running time: ${end - start} ms")
 
+    // trajectory similarity join with knn
     start = System.currentTimeMillis()
     spark.sql("SELECT COUNT(*) FROM traj1 JOIN traj2 ON DTW(traj1.traj, traj2.traj) KNN 100")
       .show()
     end = System.currentTimeMillis()
     println(s"KNN Join Running time: ${end - start} ms")
+
+    // trajectory mbr range search
+    start = System.currentTimeMillis()
+    val mbr = Rectangle(Point(Array(39.8, 116.2)), Point(Array(40.0, 116.4)))
+    spark.sql(s"SELECT COUNT(*) FROM traj1 WHERE traj1.traj IN MBRRANGE" +
+      s"(POINT(${mbr.low.coord.mkString(",")}), POINT(${mbr.high.coord.mkString(",")}))")
+      .show()
+    end = System.currentTimeMillis()
+    println(s"MBR Range Search Running time: ${end - start} ms")
+
+    // trajectory circle range search
+    start = System.currentTimeMillis()
+    val center = Point(Array(39.9, 116.3))
+    val radius = 0.1
+    spark.sql(s"SELECT COUNT(*) FROM traj1 WHERE traj1.traj IN CIRCLERANGE" +
+      s"(POINT(${center.coord.mkString(",")}), $radius)")
+      .show()
+    end = System.currentTimeMillis()
+    println(s"Circle Range Search Running time: ${end - start} ms")
 
     spark.stop()
   }

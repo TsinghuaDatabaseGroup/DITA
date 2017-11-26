@@ -41,6 +41,21 @@ case class LocalTriePartitioner(partitioner: STRPartitioner,
     }
   }
 
+  def getCandidates(key: Any, threshold: Double): List[Trajectory] = {
+    if (count <= DITAConfigConstants.LOCAL_MIN_NODE_SIZE) {
+      return data.get.flatten.toList
+    }
+
+    val childPartitions = partitioner.getPartitionsWithThreshold(key, threshold)
+    if (childPartitioners.isEmpty) {
+      childPartitions.filter(_._2 != -1).flatMap(x => data.get(x._2))
+    } else {
+      childPartitions.flatMap { case (_, x) =>
+        childPartitioners(x).getCandidates(key, threshold)
+      }
+    }
+  }
+
   def getCandidates(key: Any, threshold: Double,
                     distanceAccu: Double): List[(Trajectory, Double)] = {
     val k = TriePartitioner.getSearchKey(key)
@@ -141,6 +156,8 @@ class EmptyLocalTriePartitioner(override val level: Int,
   override def numPartitions: Int = 1
 
   override def getPartition(key: Any): Int = 0
+
+  override def getCandidates(key: Any, threshold: Double): List[Trajectory] = allData
 
   override def getCandidates(key: Any, threshold: Double,
                              distanceAccu: Double): List[(Trajectory, Double)] = {
