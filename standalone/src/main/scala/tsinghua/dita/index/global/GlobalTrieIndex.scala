@@ -17,21 +17,21 @@
 package tsinghua.dita.index.global
 
 import tsinghua.dita.common.shape.Shape
-import tsinghua.dita.common.trajectory.Trajectory
+import tsinghua.dita.common.trajectory.{Trajectory, TrajectorySimilarity}
 import tsinghua.dita.index.GlobalIndex
 import tsinghua.dita.partition.global.GlobalTriePartitioner
 
 
 case class GlobalTrieIndex(partitioner: GlobalTriePartitioner) extends GlobalIndex {
-  def getPartitions(key: Trajectory, threshold: Double): List[Int] = {
-    partitioner.getPartitions(key, threshold, 0.0).map(_._1)
+  def getPartitions(key: Trajectory, distanceFunction: TrajectorySimilarity, threshold: Double): List[Int] = {
+    partitioner.getPartitions(key, distanceFunction, threshold, 0.0).map(_._1)
   }
 
   def getPartitions(key: Shape, threshold: Double): List[Int] = {
     partitioner.getPartitions(key, threshold)
   }
 
-  def getPartitionsWithDistances(key: Trajectory, threshold: Double): List[(Int, Double)] = {
-    partitioner.getPartitions(key, threshold, 0.0)
+  def getPartitionsWithDistances(key: Trajectory, distanceFunction: TrajectorySimilarity, threshold: Double): List[(Int, Double)] = {
+    partitioner.getPartitions(key, distanceFunction, threshold, 0.0)
   }
 }

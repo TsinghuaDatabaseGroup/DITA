@@ -44,7 +44,7 @@ object TrajectorySimilarityWithThresholdAlgorithms {
     queryTrajectories.foreach(_.refresh(threshold))
 
     val answerPairs = queryTrajectories.flatMap(query => {
-      val indexCandidates = localIndex.getCandidates(query, threshold)
+      val indexCandidates = localIndex.getCandidates(query, distanceFunction, threshold)
       val mbrCandidates = indexCandidates.filter(t => query.getExtendedMBR.contains(t.getMBR))
       mbrCandidates.map(t => (t, distanceFunction.evalWithTrajectory(query, t, threshold)))
         .filter(t => t._2 <= threshold)
@@ -61,7 +61,7 @@ object TrajectorySimilarityWithThresholdAlgorithms {
       val bQuery = sparkContext.broadcast(query)
       val globalTrieIndex = trieRDD.globalIndex.asInstanceOf[GlobalTrieIndex]
 
-      val candidatePartitions = globalTrieIndex.getPartitions(query, threshold)
+      val candidatePartitions = globalTrieIndex.getPartitions(query, distanceFunction, threshold)
       PartitionPruningRDD.create(trieRDD.packedRDD, candidatePartitions.contains)
         .mapPartitions(iter =>
           localJoin(iter, Iterator(bQuery.value), distanceFunction, threshold)
@@ -85,7 +85,7 @@ object TrajectorySimilarityWithThresholdAlgorithms {
       // get right candidates RDD
       val rightCandidatesRDD = rightTrieRDD.packedRDD.flatMap(packedPartition =>
         packedPartition.data.asInstanceOf[Array[Trajectory]].flatMap(t => {
-          val candidatePartitionIdxs = bLeftGlobalTrieIndex.value.getPartitions(t, threshold)
+          val candidatePartitionIdxs = bLeftGlobalTrieIndex.value.getPartitions(t, distanceFunction, threshold)
           candidatePartitionIdxs.map(candidatePartitionIdx => (candidatePartitionIdx, t))
         })
       )
@@ -100,7 +100,7 @@ object TrajectorySimilarityWithThresholdAlgorithms {
         val localTrieIndex = packedPartition.indexes
           .filter(_.isInstanceOf[LocalTrieIndex]).head.asInstanceOf[LocalTrieIndex]
         val candidatesCount = trajectoryIter
-          .map(t => localTrieIndex.getCandidates(t, threshold).size)
+          .map(t => localTrieIndex.getCandidates(t, distanceFunction, threshold).size)
           .sum
         Array((packedPartition.id, candidatesCount)).iterator
       }.collect()
@@ -185,7 +185,7 @@ object TrajectorySimilarityWithThresholdAlgorithms {
 
       // get cost
       start = System.currentTimeMillis()
-      val (transCost, compCost) = getCost(sparkContext, leftTrieRDD, rightTrieRDD, threshold)
+      val (transCost, compCost) = getCost(sparkContext, leftTrieRDD, rightTrieRDD, distanceFunction, threshold)
       end = System.currentTimeMillis()
       logWarning(s"Computing cost time: ${(end - start) / 1000}s")
 
@@ -256,6 +256,7 @@ object TrajectorySimilarityWithThresholdAlgorithms {
     }
 
     private def getCost(sparkContext: SparkContext, leftTrieRDD: TrieRDD, rightTrieRDD: TrieRDD,
+                        distanceFunction: TrajectorySimilarity,
                         threshold: Double): (Map[String, Int], Map[String, Int]) = {
       // basic variables
       val leftGlobalTrieIndex = leftTrieRDD.globalIndex.asInstanceOf[GlobalTrieIndex]
@@ -280,7 +281,7 @@ object TrajectorySimilarityWithThresholdAlgorithms {
       val balancingSampleRate = DITAConfigConstants.BALANCING_SAMPLE_RATE
       val sampledLeftCandidatesRDD = leftTrieRDD.packedRDD.flatMap(packedPartition =>
         packedPartition.getSample(balancingSampleRate).asInstanceOf[List[Trajectory]].flatMap(t => {
-          val candidatePartitionIdxs = bRightGlobalTrieIndex.value.getPartitions(t, threshold)
+          val candidatePartitionIdxs = bRightGlobalTrieIndex.value.getPartitions(t, distanceFunction, threshold)
           candidatePartitionIdxs.foreach(candidatePartitionIdx =>
             transCost.add((s"L${packedPartition.id}-R$candidatePartitionIdx", 1)))
           candidatePartitionIdxs.map(candidatePartitionIdx => (candidatePartitionIdx, t))
@@ -290,7 +291,7 @@ object TrajectorySimilarityWithThresholdAlgorithms {
 
       val sampledRightCandidatesRDD = rightTrieRDD.packedRDD.flatMap(packedPartition =>
         packedPartition.getSample(balancingSampleRate).asInstanceOf[List[Trajectory]].flatMap(t => {
-          val candidatePartitionIdxs = bLeftGlobalTrieIndex.value.getPartitions(t, threshold)
+          val candidatePartitionIdxs = bLeftGlobalTrieIndex.value.getPartitions(t, distanceFunction, threshold)
           candidatePartitionIdxs.foreach(candidatePartitionIdx =>
             transCost.add((s"R${packedPartition.id}-L$candidatePartitionIdx", 1)))
           candidatePartitionIdxs.map(candidatePartitionIdx => (candidatePartitionIdx, t))
@@ -306,9 +307,9 @@ object TrajectorySimilarityWithThresholdAlgorithms {
         val localTrieIndex = packedPartition.indexes
           .filter(_.isInstanceOf[LocalTrieIndex]).head.asInstanceOf[LocalTrieIndex]
         trajectoryIter.foreach(t => {
-          val rightPartitionIdx = bRightGlobalTrieIndex.value.getPartitions(t, 0.0).head
+          val rightPartitionIdx = bRightGlobalTrieIndex.value.getPartitions(t, distanceFunction, 0.0).head
           compCost.add((s"R$rightPartitionIdx-L${packedPartition.id}",
-            localTrieIndex.getCandidates(t, threshold).size))
+            localTrieIndex.getCandidates(t, distanceFunction, threshold).size))
         })
         Array(packedPartition.id).iterator
       }.count()
@@ -320,9 +321,9 @@ object TrajectorySimilarityWithThresholdAlgorithms {
         val localTrieIndex = packedPartition.indexes
           .filter(_.isInstanceOf[LocalTrieIndex]).head.asInstanceOf[LocalTrieIndex]
         trajectoryIter.foreach(t => {
-          val leftPartitionIdx = bLeftGlobalTrieIndex.value.getPartitions(t, 0.0).head
+          val leftPartitionIdx = bLeftGlobalTrieIndex.value.getPartitions(t, distanceFunction, 0.0).head
           compCost.add((s"L$leftPartitionIdx-R${packedPartition.id}",
-            localTrieIndex.getCandidates(t, threshold).size))
+            localTrieIndex.getCandidates(t, distanceFunction, threshold).size))
         })
         Array(packedPartition.id).iterator
       }.count()
@@ -463,7 +464,7 @@ object TrajectorySimilarityWithThresholdAlgorithms {
       // candidates
       val rightCandidatesRDD = rightTrieRDD.packedRDD.flatMap(packedPartition =>
         packedPartition.data.asInstanceOf[Array[Trajectory]].flatMap(t => {
-          val candidatePartitionIdxs = bGlobalTrieIndex.value.getPartitions(t, threshold)
+          val candidatePartitionIdxs = bGlobalTrieIndex.value.getPartitions(t, distanceFunction, threshold)
           val sentCandidatePartitionIdxs = candidatePartitionIdxs.filter(candidatePartitionIdx =>
             bRight2LeftEdges.value.contains((packedPartition.id, candidatePartitionIdx)) ||
               (!bLeft2RightEdges.value.contains(candidatePartitionIdx, packedPartition.id)

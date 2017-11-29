@@ -17,21 +17,21 @@
 package tsinghua.dita.index.local
 
 import tsinghua.dita.common.shape.Shape
-import tsinghua.dita.common.trajectory.Trajectory
+import tsinghua.dita.common.trajectory.{Trajectory, TrajectorySimilarity}
 import tsinghua.dita.index.LocalIndex
 import tsinghua.dita.partition.local.LocalTriePartitioner
 
 case class LocalTrieIndex(partitioner: LocalTriePartitioner) extends LocalIndex {
-  def getCandidates(key: Trajectory, threshold: Double): List[Trajectory] = {
-    partitioner.getCandidates(key, threshold, 0.0).filter(_._2 <= threshold).map(_._1)
+  def getCandidates(key: Trajectory, distanceFunction: TrajectorySimilarity, threshold: Double): List[Trajectory] = {
+    partitioner.getCandidates(key, distanceFunction, threshold, 0.0).filter(_._2 <= threshold).map(_._1)
   }
 
   def getCandidates(key: Shape, threshold: Double): List[Trajectory] = {
     partitioner.getCandidates(key, threshold)
   }
 
-  def getCandidatesWithDistances(key: Trajectory, threshold: Double): List[(Trajectory, Double)] = {
-    partitioner.getCandidates(key, threshold, 0.0)
+  def getCandidatesWithDistances(key: Trajectory, distanceFunction: TrajectorySimilarity, threshold: Double): List[(Trajectory, Double)] = {
+    partitioner.getCandidates(key, distanceFunction, threshold, 0.0)
   }
 }
 
