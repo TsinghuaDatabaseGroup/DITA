@@ -26,7 +26,7 @@ Examples
 
 Usage
 ---------------
-The `master` branch is the version integrated with Spark SQL, and we will release a new branch for the standalone version soon.
+The `master` branch is the version integrated with Spark SQL, and the `standalone` branch is a stand-alone version just with DITA code.
 
 Contributors
 ------------
