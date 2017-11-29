@@ -17,7 +17,7 @@
 package org.apache.spark.sql.execution.dita.index.global
 
 import org.apache.spark.sql.catalyst.expressions.dita.common.shape.Shape
-import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.Trajectory
+import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.{Trajectory, TrajectorySimilarity}
 import org.apache.spark.sql.catalyst.expressions.dita.index.GlobalIndex
 import org.apache.spark.sql.execution.dita.partition.global.GlobalTriePartitioner
 

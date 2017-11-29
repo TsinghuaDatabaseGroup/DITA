@@ -40,7 +40,7 @@ case class LocalTriePartitioner(partitioner: STRPartitioner,
     }
   }
 
-  def getCandidates(key: Any, threshold: Double): List[Trajectory] = {
+  def getCandidates(key: Shape, threshold: Double): List[Trajectory] = {
     if (count <= DITAConfigConstants.LOCAL_MIN_NODE_SIZE) {
       return data.get.flatten.toList
     }
@@ -55,11 +55,9 @@ case class LocalTriePartitioner(partitioner: STRPartitioner,
     }
   }
 
-  def getCandidates(key: Any, threshold: Double,
+  def getCandidates(key: Any, distanceFunction: TrajectorySimilarity, threshold: Double,
                     distanceAccu: Double): List[(Trajectory, Double)] = {
     val k = TriePartitioner.getSearchKey(key)
-    val distanceFunction = DITAConfigConstants.DISTANCE_FUNCTION
-
     if (count <= DITAConfigConstants.LOCAL_MIN_NODE_SIZE) {
       return data.get.flatten.toList.map((_, threshold))
     }
@@ -79,7 +77,7 @@ case class LocalTriePartitioner(partitioner: STRPartitioner,
               val distance = shape.minDist(k.head)
               val newDistanceAccu = distanceFunction.updateDistance(distanceAccu, distance)
               val newThreshold = distanceFunction.updateThreshold(threshold, distance)
-              childPartitioners(x).getCandidates(k.tail, newThreshold, newDistanceAccu)
+              childPartitioners(x).getCandidates(k.tail, distanceFunction, newThreshold, newDistanceAccu)
             }
           }
         } else {
@@ -95,7 +93,7 @@ case class LocalTriePartitioner(partitioner: STRPartitioner,
               if (childPartitioners.isEmpty) {
                 data.get(x).map((_, newDistanceAccu))
               } else {
-                childPartitioners(x).getCandidates(newK, newThreshold, newDistanceAccu)
+                childPartitioners(x).getCandidates(newK, distanceFunction, newThreshold, newDistanceAccu)
               }
             }
           }
@@ -115,7 +113,7 @@ case class LocalTriePartitioner(partitioner: STRPartitioner,
                 data.get(x).map((_, newDistanceAccu))
               } else {
                 val newThreshold = distanceFunction.updateThreshold(threshold, distance)
-                childPartitioners(x).getCandidates(k.tail,
+                childPartitioners(x).getCandidates(k.tail, distanceFunction,
                   newThreshold, newDistanceAccu)
               }
             }
@@ -136,7 +134,7 @@ case class LocalTriePartitioner(partitioner: STRPartitioner,
                 data.get(x).map((_, newDistanceAccu))
               } else {
                 val newThreshold = distanceFunction.updateThreshold(threshold, distance)
-                childPartitioners(x).getCandidates(k,
+                childPartitioners(x).getCandidates(k, distanceFunction,
                   newThreshold, newDistanceAccu)
               }
             }
@@ -156,9 +154,9 @@ class EmptyLocalTriePartitioner(override val level: Int,
 
   override def getPartition(key: Any): Int = 0
 
-  override def getCandidates(key: Any, threshold: Double): List[Trajectory] = allData
+  override def getCandidates(key: Shape, threshold: Double): List[Trajectory] = allData
 
-  override def getCandidates(key: Any, threshold: Double,
+  override def getCandidates(key: Any, distanceFunction: TrajectorySimilarity, threshold: Double,
                              distanceAccu: Double): List[(Trajectory, Double)] = {
     allData.map((_, distanceAccu))
   }

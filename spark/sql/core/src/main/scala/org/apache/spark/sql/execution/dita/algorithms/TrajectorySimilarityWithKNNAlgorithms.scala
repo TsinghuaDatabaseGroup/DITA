@@ -54,7 +54,7 @@ object TrajectorySimilarityWithKNNAlgorithms {
       while (!canExit) {
         threshold = threshold / 2.0
         val candidates = queryTrajectories.flatMap(query =>
-          localIndex.getCandidatesWithDistances(query, threshold).map(x => (x._1, query, x._2)))
+          localIndex.getCandidatesWithDistances(query, distanceFunction, threshold).map(x => (x._1, query, x._2)))
         if (candidates.length >= DITAConfigConstants.KNN_COEFFICIENT * count) {
           finalCandidates = candidates
         }
@@ -125,7 +125,7 @@ object TrajectorySimilarityWithKNNAlgorithms {
       val rightSingleCandidatesRDD = rightTrieRDD.packedRDD.flatMap(packedPartition =>
         packedPartition.getSample(DITAConfigConstants.KNN_MAX_SAMPLING_RATE)
           .asInstanceOf[List[Trajectory]].map(trajectory =>
-          (bGlobalTrieIndex.value.getPartitions(trajectory, 0.0).head, trajectory)
+          (bGlobalTrieIndex.value.getPartitions(trajectory, distanceFunction, 0.0).head, trajectory)
         )
       )
       val partitionedRightSingleCandidatesRDD = ExactKeyPartitioner.partition(
@@ -135,7 +135,7 @@ object TrajectorySimilarityWithKNNAlgorithms {
       var sampleRate = math.pow(10, -(DITAConfigConstants.KNN_MAX_GLOBAL_ITERATION - 1))
       for {_ <- 1 to DITAConfigConstants.KNN_MAX_GLOBAL_ITERATION} {
         val allThresholds = leftTrieRDD.packedRDD.zipPartitions(
-          partitionedRightSingleCandidatesRDD.sample(withReplacement = true, sampleRate)) { case (partitionIter, trajectoryIter) =>
+          partitionedRightSingleCandidatesRDD.sample(true, sampleRate)) { case (partitionIter, trajectoryIter) =>
           getThresholdLocal(partitionIter, trajectoryIter, distanceFunction, count, finalThreshold)
         }.collect().sorted.take(count)
         if (allThresholds.nonEmpty) {

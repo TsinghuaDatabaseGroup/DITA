@@ -19,7 +19,7 @@ package org.apache.spark.sql.execution.dita.partition
 import org.apache.spark.Partitioner
 import org.apache.spark.sql.catalyst.expressions.dita.common.DITAConfigConstants
 import org.apache.spark.sql.catalyst.expressions.dita.common.shape.{Point, Shape}
-import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.Trajectory
+import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.{Trajectory, TrajectorySimilarity}
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.TrajectorySimilarity.{DTWDistance, EDRDistance, FrechetDistance, LCSSDistance}
 
 abstract class TriePartitioner(partitioner: STRPartitioner,
@@ -46,11 +46,10 @@ abstract class TriePartitioner(partitioner: STRPartitioner,
     }
   }
 
-  def getPartitions(key: Any, threshold: Double,
+  def getPartitions(key: Any, distanceFunction: TrajectorySimilarity, threshold: Double,
                     distanceAccu: Double): List[(Int, Double)] = {
     val k = TriePartitioner.getSearchKey(key)
-    val distanceFunction = DITAConfigConstants.DISTANCE_FUNCTION
-
+    
     distanceFunction match {
       case DTWDistance | FrechetDistance =>
         if (level > indexedPivotCount) {
@@ -66,7 +65,7 @@ abstract class TriePartitioner(partitioner: STRPartitioner,
               val distance = shape.minDist(k.head)
               val newDistanceAccu = distanceFunction.updateDistance(distanceAccu, distance)
               val newThreshold = distanceFunction.updateThreshold(threshold, distance)
-              childPartitioners(x).getPartitions(k.tail, newThreshold, newDistanceAccu)
+              childPartitioners(x).getPartitions(k.tail, distanceFunction, newThreshold, newDistanceAccu)
                 .map(y => (totalPartitions(x) + y._1, y._2))
             }.filter(_._2 <= threshold)
           }
@@ -83,7 +82,7 @@ abstract class TriePartitioner(partitioner: STRPartitioner,
                 List((x, newDistanceAccu))
               } else {
                 val newThreshold = distanceFunction.updateThreshold(threshold, distance)
-                val ys = childPartitioners(x).getPartitions(newK,
+                val ys = childPartitioners(x).getPartitions(newK, distanceFunction,
                   newThreshold, newDistanceAccu)
                 ys.map(y => (totalPartitions(x) + y._1, y._2))
               }
@@ -105,7 +104,7 @@ abstract class TriePartitioner(partitioner: STRPartitioner,
                 List((x, newDistanceAccu))
               } else {
                 val newThreshold = distanceFunction.updateThreshold(threshold, distance)
-                val ys = childPartitioners(x).getPartitions(k.tail,
+                val ys = childPartitioners(x).getPartitions(k.tail, distanceFunction,
                   newThreshold, newDistanceAccu)
                 ys.filter(_._1 != -1).map(y => (totalPartitions(x) + y._1, y._2))
               }
@@ -127,7 +126,7 @@ abstract class TriePartitioner(partitioner: STRPartitioner,
                 List((x, newDistanceAccu))
               } else {
                 val newThreshold = distanceFunction.updateThreshold(threshold, distance)
-                val ys = childPartitioners(x).getPartitions(k,
+                val ys = childPartitioners(x).getPartitions(k, distanceFunction,
                   newThreshold, newDistanceAccu)
                 ys.filter(_._1 != -1).map(y => (totalPartitions(x) + y._1, y._2))
               }
