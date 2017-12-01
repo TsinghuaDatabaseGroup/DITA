@@ -8,7 +8,6 @@ Development
 
 Since we use IntelliJ for development, you can consult [the official guide for setuping up the IDE](http://spark.apache.org/developer-tools.html). Besides, you should do the following things:
 
-- Install the [ANTLR v4 plug-in for IntelliJ](https://plugins.jetbrains.com/plugin/7358-antlr-v4-grammar-plugin) which will be used in Section 1.
 - Go to View > Tool Windows > Maven Projects and add `hadoop-2.6`, `hive-provided`, `hive-thriftserver`, `yarn` in `Profiles` (there are some default profiles as well, don't change them). Then **Reimport All Maven Projects** (the first button on upper-right corner), **Generate Sources and Update Folders For All Projects** (the second button on upper-right corner).
 - Rebuild the whole project, which would fail but is essential for following steps.
 - Marking Generated Sources:
