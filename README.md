@@ -13,7 +13,6 @@ Since we use IntelliJ for development, you can consult [the official guide for s
 - Marking Generated Sources:
     - Go to File > Project Structure > Project Settings > Modules. Find `spark-streaming-flume-sink`, and mark `target/scala-2.11/src_managed/main/compiled_avro` as source. (Click on the Sources on the top to mark)
     - Go to File > Project Structure > Project Settings > Modules. Find `spark-hive-thriftserver`, and mark `src/gen/java` as source. (Click on the Sources on the top to mark)
-    - Go to File > Project Structure > Project Settings > Modules. Find `spark-hive-thriftserver`, and mark `src/gen/java` as source. (Click on the Sources on the top to mark)
 - Rebuild the whole project again, which should work well now. If there still exist some compilation errors for not finding some classes, you may return to last step and marking corresponding sources if not included.
 
 Examples
