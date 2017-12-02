@@ -17,8 +17,8 @@
 package org.apache.spark.sql.execution.dita.partition.local
 
 import org.apache.spark.sql.catalyst.expressions.dita.common.DITAConfigConstants
-import org.apache.spark.sql.catalyst.expressions.dita.common.shape.Point
-import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.Trajectory
+import org.apache.spark.sql.catalyst.expressions.dita.common.shape.{Point, Shape}
+import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.{Trajectory, TrajectorySimilarity}
 import org.apache.spark.sql.catalyst.expressions.dita.common.trajectory.TrajectorySimilarity.{DTWDistance, EDRDistance, FrechetDistance, LCSSDistance}
 import org.apache.spark.sql.execution.dita.partition.{STRPartitioner, TriePartitioner}
 

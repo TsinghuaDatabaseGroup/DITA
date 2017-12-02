@@ -43,7 +43,7 @@ object DITADataFrameExample {
     import spark.implicits._
 
     val trajs = spark.sparkContext
-      .textFile("examples/src/main/resources/trajectory_small.txt")
+      .textFile("examples/src/main/resources/trajectory.txt")
       .zipWithIndex().map(getTrajectory)
       .filter(_.traj.length >= DITAConfigConstants.TRAJECTORY_MIN_LENGTH)
       .filter(_.traj.length <= DITAConfigConstants.TRAJECTORY_MAX_LENGTH)
@@ -52,7 +52,7 @@ object DITADataFrameExample {
     df1.createTrieIndex(df1("traj"), "traj_index1")
 
     val df2 = spark.sparkContext
-      .textFile("examples/src/main/resources/trajectory_small.txt")
+      .textFile("examples/src/main/resources/trajectory.txt")
       .zipWithIndex().map(getTrajectory)
       .filter(_.traj.length >= DITAConfigConstants.TRAJECTORY_MIN_LENGTH)
       .filter(_.traj.length <= DITAConfigConstants.TRAJECTORY_MAX_LENGTH)

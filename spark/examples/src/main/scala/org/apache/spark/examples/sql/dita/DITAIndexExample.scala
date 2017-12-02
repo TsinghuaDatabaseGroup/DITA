@@ -40,7 +40,7 @@ object DITAIndexExample {
     import spark.implicits._
 
     val df = spark.sparkContext
-      .textFile("examples/src/main/resources/trajectory_small.txt")
+      .textFile("examples/src/main/resources/trajectory.txt")
       .zipWithIndex().map(getTrajectory)
       .filter(_.traj.length >= DITAConfigConstants.TRAJECTORY_MIN_LENGTH)
       .filter(_.traj.length <= DITAConfigConstants.TRAJECTORY_MAX_LENGTH)

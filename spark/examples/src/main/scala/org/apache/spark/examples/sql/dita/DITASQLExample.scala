@@ -42,7 +42,7 @@ object DITASQLExample {
     import spark.implicits._
 
     val trajs = spark.sparkContext
-      .textFile("examples/src/main/resources/trajectory_small.txt")
+      .textFile("examples/src/main/resources/trajectory.txt")
       .zipWithIndex().map(getTrajectory)
       .filter(_.traj.length >= DITAConfigConstants.TRAJECTORY_MIN_LENGTH)
       .filter(_.traj.length <= DITAConfigConstants.TRAJECTORY_MAX_LENGTH)
@@ -115,13 +115,6 @@ object DITASQLExample {
       .show()
     end = System.currentTimeMillis()
     println(s"Circle Range Search Running time: ${end - start} ms")
-
-    val csv = spark.read.format("csv")
-      .option("header", "false")
-      .option("delimiter", "\t")
-      .option("inferSchema", "true")
-      .load(args(0))
-    csv.cache()
 
     spark.stop()
   }
