@@ -50,8 +50,7 @@ export default class LeafletMap extends Visualization {
     super(targetEl, config);
 
     const columnSpec = [
-      { name: 'latitude'},
-      { name: 'longitude'},
+      { name: 'points'},
       { name: 'tooltip'},
       { name: 'popup'}
     ];
@@ -105,8 +104,8 @@ export default class LeafletMap extends Visualization {
 
     const markers = chartDataModel.rows.map(
       row => {
-        const {latLng, tooltip, popup}= row;
-        const marker = L.marker(latLng);
+        const {points, tooltip, popup} = row;
+        const marker = L.marker(points[0]);
         const mapMarker = marker.addTo(map);
         if (tooltip && tooltip !== '') {
           mapMarker.bindTooltip(tooltip);
@@ -148,19 +147,28 @@ export default class LeafletMap extends Visualization {
     };
 
     const config = this.getTransformation().config;
-    const latIdx = getColumnIndex(config, 'latitude');
-    const lngIdx = getColumnIndex(config, 'longitude');
+    const pointsIdx = getColumnIndex(config, 'points');
     const tooltipIdx = getColumnIndex(config, 'tooltip');
     const popupIdx = getColumnIndex(config, 'popup', true);
 
     const rows = data.rows.map(tableRow => {
       const tooltip = tableRow[tooltipIdx];
-      const lat = Number(tableRow[latIdx]);
-      const lng = Number(tableRow[lngIdx]);
-      const latLng = L.latLng(lat, lng).wrap();
+      const pointsStr = tableRow[pointsIdx];
+      var re = /WrappedArray\(([\d\.]*), ([\d\.]*)\)/g;
+      var m;
+      var points = [];
+      do {
+        m = re.exec(pointsStr);
+        if (m) {
+          const lat = Number(m[1]);
+          const lng = Number(m[2]);
+          points.push(L.latLng(lat, lng).wrap());
+        }
+      } while (m);
+      // const points = ;
       const popup = popupIdx < 0 ? null : tableRow[popupIdx];
       return {
-        latLng,
+        points,
         tooltip,
         popup
       };
