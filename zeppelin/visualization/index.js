@@ -98,15 +98,30 @@ export default class LeafletMap extends Visualization {
         </div>`
   }
 
+  getRandomColor() {
+    var letters = '0123456789ABCDEF';
+    var color = '#';
+    for (var i = 0; i < 6; i++) {
+      color += letters[Math.floor(Math.random() * 16)];
+    }
+    return color;
+  }
+
   drawMapChart(chartDataModel) {
 
     const map = this.showChart();
 
-    const markers = chartDataModel.rows.map(
+    L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+
+    var markers = chartDataModel.rows.map(
       row => {
         const {points, tooltip, popup} = row;
-        const marker = L.marker(points[0]);
-        const mapMarker = marker.addTo(map);
+
+        var marker = new L.Polyline(points, {color: this.getRandomColor(), weight: 4});
+        var mapMarker = marker.addTo(map);
+
         if (tooltip && tooltip !== '') {
           mapMarker.bindTooltip(tooltip);
         }
@@ -121,14 +136,10 @@ export default class LeafletMap extends Visualization {
 
     let featureGroup = L.featureGroup(markers);
     const bounds = featureGroup.getBounds().pad(0.5);
-
     map.fitBounds(bounds);
-    L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
-    }).addTo(map);
 
     this.getChartElement().style.height = this.targetEl.height();
-    map.invalidateSize(true)
+    map.invalidateSize(true);
   };
 
   createMapDataModel(data) {
@@ -137,7 +148,7 @@ export default class LeafletMap extends Visualization {
       const fieldConf = config[fieldName];
       if(fieldConf instanceof Object) {
         return fieldConf.index
-      } else if(isOptional) {
+      } else if (isOptional) {
         return -1
       } else {
         throw {
@@ -148,7 +159,7 @@ export default class LeafletMap extends Visualization {
 
     const config = this.getTransformation().config;
     const pointsIdx = getColumnIndex(config, 'points');
-    const tooltipIdx = getColumnIndex(config, 'tooltip');
+    const tooltipIdx = getColumnIndex(config, 'tooltip', true);
     const popupIdx = getColumnIndex(config, 'popup', true);
 
     const rows = data.rows.map(tableRow => {
@@ -162,7 +173,7 @@ export default class LeafletMap extends Visualization {
         if (m) {
           const lat = Number(m[1]);
           const lng = Number(m[2]);
-          points.push(L.latLng(lat, lng).wrap());
+          points.push(L.latLng(lat, lng));
         }
       } while (m);
       // const points = ;
