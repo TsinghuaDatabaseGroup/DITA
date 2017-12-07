@@ -52,6 +52,8 @@ export default class LeafletMap extends Visualization {
     const columnSpec = [
       { name: 'points'},
       { name: 'tooltip'},
+      { name: 'points2'},
+      { name: 'tooltip2'},
       { name: 'popup'}
     ];
 
@@ -117,13 +119,26 @@ export default class LeafletMap extends Visualization {
 
     var markers = chartDataModel.rows.map(
       row => {
-        const {points, tooltip, popup} = row;
+        const {points, tooltip, points2, tooltip2, popup} = row;
 
         var marker = new L.Polyline(points, {color: this.getRandomColor(), weight: 4});
         var mapMarker = marker.addTo(map);
 
         if (tooltip && tooltip !== '') {
           mapMarker.bindTooltip(tooltip);
+        }
+
+        if (popup && popup !== '') {
+          mapMarker.bindPopup(popup);
+        }
+
+        if (points2) {
+          var marker2 = new L.Polyline(points2, {color: this.getRandomColor(), weight: 4});
+          var mapMarker2 = marker.addTo(map);
+
+          if (tooltip2 && tooltip2 !== '') {
+            mapMarker2.bindTooltip(tooltip2);
+          }
         }
 
         if (popup && popup !== '') {
@@ -159,7 +174,9 @@ export default class LeafletMap extends Visualization {
 
     const config = this.getTransformation().config;
     const pointsIdx = getColumnIndex(config, 'points');
-    const tooltipIdx = getColumnIndex(config, 'tooltip', true);
+    const points2Idx = getColumnIndex(config, 'points2', true);
+    const tooltipIdx = getColumnIndex(config, 'tooltip');
+    const tooltip2Idx = getColumnIndex(config, 'tooltip2', true);
     const popupIdx = getColumnIndex(config, 'popup', true);
 
     const rows = data.rows.map(tableRow => {
@@ -176,11 +193,14 @@ export default class LeafletMap extends Visualization {
           points.push(L.latLng(lat, lng));
         }
       } while (m);
-      // const points = ;
+      const points2 = points2Idx < 0 ? null : tableRow[points2Idx];
+      const tooltip2 = tooltip2Idx < 0 ? null : tableRow[tooltip2Idx];
       const popup = popupIdx < 0 ? null : tableRow[popupIdx];
       return {
         points,
         tooltip,
+        points2,
+        tooltip2,
         popup
       };
     });
