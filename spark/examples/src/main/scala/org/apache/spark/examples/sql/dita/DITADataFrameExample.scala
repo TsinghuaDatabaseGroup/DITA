@@ -59,7 +59,7 @@ object DITADataFrameExample {
       .toDF()
     df2.createTrieIndex(df2("traj"), "traj_index2")
 
-    val queryTrajectory = Trajectory(trajs.take(1).head.traj.map(Point))
+    val queryTrajectory = Trajectory(trajs.filter(t => t.id == 982).take(1).head.traj.map(Point))
     df1.trajectorySimilarityWithThresholdSearch(queryTrajectory, df1("traj"),
       TrajectorySimilarityFunction.DTW, 0.005).show()
 

@@ -40,7 +40,7 @@ object TrajectoryExecUtils {
       .map(_.asInstanceOf[TrieIndexedRelation].trieRDD)
       .getOrElse({
         val leftRDD = rdd.asInstanceOf[RDD[UnsafeRow]].map(row =>
-          new DITAIternalRow(row, TrajectorySimilarityExpression.getPoints(
+          new DITAIternalRow(row.copy(), TrajectorySimilarityExpression.getPoints(
             BindReferences.bindReference(key, physicalPlan.output)
               .eval(row).asInstanceOf[UnsafeArrayData]))).asInstanceOf[RDD[Trajectory]]
         new TrieRDD(leftRDD)

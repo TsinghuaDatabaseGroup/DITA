@@ -1,0 +1,29 @@
+{
+  "name": "dita-trajectory-visualization",
+  "description": "Trajectory visualization using the Leaflet map library.",
+  "author": "Zeyuan Shang(zeyuanxy@gmail.com), Mitchell Yuwono (Maintainer), Tom Grant <tgrant@volumeintegration.com> (http://volumeintegration.com)",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepare": "jq '{ type: .helium.type, name: .name, description: .description, artifact: (.name + \"@\"+ .version), license: .license, icon: .helium.icon}' package.json > dita-trajectory-visualization.json",
+    "helium.dev": "jq --arg pwd `pwd` '{ type: .helium.type, name: .name, description: .description, artifact: $pwd, license: .license, icon: .helium.icon}' package.json > dita-trajectory-visualization.json"
+  },
+  "keywords": [
+    "zeppelin",
+    "helium",
+    "trajectory",
+    "visualization"
+  ],
+  "license": "BSD-2-Clause",
+  "dependencies": {
+    "zeppelin-tabledata": "*",
+    "zeppelin-vis": "*",
+    "leaflet": "~1.2.0",
+    "leaflet-trajectorymarker": "1.0.4"
+  },
+  "helium": {
+    "type": "VISUALIZATION",
+    "icon": "<i class='fa fa-globe'></i>"
+  }
+}

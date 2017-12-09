@@ -70,10 +70,11 @@ object DITASQLExample {
 
     // trajectory similarity search with threshold
     start = System.currentTimeMillis()
-    var queryTrajStr = trajs.take(1).head.traj
+    var queryTrajStr = trajs.filter(t => t.id == 982).take(1).head.traj
       .map(point => s"POINT(${point.mkString(",")})").mkString(",")
     queryTrajStr = s"TRAJECTORY($queryTrajStr)"
-    spark.sql(s"SELECT COUNT(*) FROM traj1 WHERE DTW(traj1.traj, $queryTrajStr) <= 0.005").show()
+    println(queryTrajStr)
+    spark.sql(s"SELECT * FROM traj1 WHERE DTW(traj1.traj, $queryTrajStr) <= 0.003").show()
     end = System.currentTimeMillis()
     println(s"Threshold Search Running time: ${end - start} ms")
 
@@ -85,8 +86,7 @@ object DITASQLExample {
 
     // trajectory similarity join with threshold
     start = System.currentTimeMillis()
-    spark.sql("SELECT COUNT(*) FROM traj1 JOIN traj2 ON DTW(traj1.traj, traj2.traj) <= 0.005")
-      .show()
+    spark.sql("SELECT * FROM traj1 JOIN traj2 ON DTW(traj1.traj, traj2.traj) <= 0.005").show()
     end = System.currentTimeMillis()
     println(s"Threshold Join Running time: ${end - start} ms")
 
