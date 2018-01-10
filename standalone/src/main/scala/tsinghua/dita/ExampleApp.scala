@@ -48,7 +48,7 @@ object ExampleApp {
     val thresholdJoinAnswer = thresholdJoin.join(spark.sparkContext, rdd1, rdd2, TrajectorySimilarity.DTWDistance, 0.005)
     println(s"Threshold join answer count: ${thresholdJoinAnswer.count()}")
 
-    // threshold-based search
+    // knn join
     val knnJoin = TrajectorySimilarityWithKNNAlgorithms.DistributedJoin
     val knnJoinAnswer = knnJoin.join(spark.sparkContext, rdd1, rdd2, TrajectorySimilarity.DTWDistance, 100)
     println(s"KNN join answer count: ${knnJoinAnswer.count()}")
