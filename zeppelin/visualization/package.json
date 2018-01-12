@@ -20,7 +20,7 @@
     "zeppelin-tabledata": "*",
     "zeppelin-vis": "*",
     "leaflet": "~1.2.0",
-    "leaflet-trajectorymarker": "1.0.4"
+    "leaflet-polylinedecorator": "*"
   },
   "helium": {
     "type": "VISUALIZATION",

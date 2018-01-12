@@ -28,7 +28,7 @@ import Visualization from 'zeppelin-vis'
 import ColumnselectorTransformation from 'zeppelin-tabledata/columnselector'
 
 
-import L from 'leaflet/dist/leaflet'
+import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
 // workaround https://github.com/Leaflet/Leaflet/issues/4968
@@ -43,6 +43,8 @@ let DefaultIcon = L.icon({
   shadowUrl: iconShadow
 });
 L.Marker.prototype.options.icon = DefaultIcon;
+
+import 'leaflet-polylinedecorator/dist/leaflet.polylineDecorator'
 
 export default class LeafletMap extends Visualization {
 
@@ -128,10 +130,6 @@ export default class LeafletMap extends Visualization {
           mapMarker.bindTooltip(tooltip);
         }
 
-        if (popup && popup !== '') {
-          mapMarker.bindPopup(popup);
-        }
-
         if (points2) {
           var marker2 = new L.Polyline(points2, {color: this.getRandomColor(), weight: 4});
           var mapMarker2 = marker.addTo(map);
@@ -142,7 +140,18 @@ export default class LeafletMap extends Visualization {
         }
 
         if (popup && popup !== '') {
-          mapMarker.bindPopup(popup);
+          // mapMarker.bindPopup(popup);
+          /*
+          points.forEach(point => {
+            var marker3 = new L.circle(point, {radius: 10});
+            const mapMarker3 = marker3.addTo(map);
+          });
+          */
+          var decorator = L.polylineDecorator(mapMarker, {
+            patterns: [
+                {offset: 0, repeat: 30, symbol: L.Symbol.arrowHead({pixelSize: 12, headAngle: 30, pathOptions: {weight: 3}})}
+            ]
+          }).addTo(map);
         }
 
         return marker
