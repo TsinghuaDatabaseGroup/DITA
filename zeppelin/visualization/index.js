@@ -115,8 +115,16 @@ export default class LeafletMap extends Visualization {
 
     const map = this.showChart();
 
+    /*
     L.tileLayer('http://{s}.tile.osm.org/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(map);
+    */
+    L.tileLayer('https://api.tiles.mapbox.com/v4/{id}/{z}/{x}/{y}.png?access_token={accessToken}', {
+      attribution: 'Map data &copy; <a href="http://openstreetmap.org">OpenStreetMap</a> contributors, <a href="http://creativecommons.org/licenses/by-sa/2.0/">CC-BY-SA</a>, Imagery © <a href="http://mapbox.com">Mapbox</a>',
+      maxZoom: 18,
+      id: 'mapbox.run-bike-hike',
+      accessToken: 'pk.eyJ1IjoiemV5dWFueHkiLCJhIjoiY2pjY3JtZWo4MGp3MDMzdWpyZmU0cDlrYyJ9.CF-LV9WiUNvjQGByT6RyIw'
     }).addTo(map);
 
     var markers = chartDataModel.rows.map(
