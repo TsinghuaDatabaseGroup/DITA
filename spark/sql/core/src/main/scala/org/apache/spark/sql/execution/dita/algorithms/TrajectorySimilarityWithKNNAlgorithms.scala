@@ -124,8 +124,15 @@ object TrajectorySimilarityWithKNNAlgorithms {
       // get threshold
       val rightSingleCandidatesRDD = rightTrieRDD.packedRDD.flatMap(packedPartition =>
         packedPartition.getSample(DITAConfigConstants.KNN_MAX_SAMPLING_RATE)
-          .asInstanceOf[List[Trajectory]].map(trajectory =>
-          (bGlobalTrieIndex.value.getPartitions(trajectory, distanceFunction, 0.0).head, trajectory)
+          .asInstanceOf[List[Trajectory]].map(trajectory => {
+            val partitions = bGlobalTrieIndex.value.getPartitions(trajectory, distanceFunction, 0.0)
+            val partition = if (partitions.isEmpty) {
+              Random.nextInt(bGlobalTrieIndex.value.partitioner.numPartitions)
+            } else {
+              partitions.head
+            }
+          (partition, trajectory)
+          }
         )
       )
       val partitionedRightSingleCandidatesRDD = ExactKeyPartitioner.partition(
